@@ -1,0 +1,602 @@
+<!DOCTYPE html><html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ACS Web Inspector / Extractor</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0f1115;
+      --panel: #171a21;
+      --panel-2: #1f2430;
+      --border: #2d3442;
+      --text: #eef2ff;
+      --muted: #aeb6c9;
+      --accent: #7dd3fc;
+      --accent-2: #c4b5fd;
+      --danger: #f87171;
+      --ok: #34d399;
+      --shadow: 0 12px 40px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(1200px 700px at 20% 0%, #182033 0%, var(--bg) 60%);
+      color: var(--text);
+    }
+    a { color: var(--accent); }
+    button, input, select, textarea {
+      font: inherit;
+    }
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 16px;
+      padding: 16px;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 0;
+    }
+    .main {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      gap: 16px;
+      min-width: 0;
+    }
+    .section {
+      padding: 16px;
+    }
+    .title {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: .02em;
+      margin: 0 0 6px 0;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .dropzone {
+      border: 1.5px dashed #44506a;
+      border-radius: 16px;
+      padding: 18px;
+      text-align: center;
+      background: rgba(255,255,255,.02);
+      transition: .18s ease;
+    }
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(125, 211, 252, .08);
+      transform: scale(1.01);
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .stack { display: flex; flex-direction: column; gap: 10px; }
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .toolbar > * { flex: 0 0 auto; }
+    .btn {
+      background: linear-gradient(180deg, #2a3140, #222938);
+      color: var(--text);
+      border: 1px solid #384356;
+      border-radius: 14px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: .15s ease;
+      user-select: none;
+    }
+    .btn:hover { border-color: #5a6b8f; transform: translateY(-1px); }
+    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+    .btn.primary { background: linear-gradient(180deg, #173a4f, #102735); border-color: #2c6d8e; }
+    .btn.good { background: linear-gradient(180deg, #114136, #0c2d26); border-color: #1f6b58; }
+    .btn.warn { background: linear-gradient(180deg, #4b2419, #311813); border-color: #7b3c29; }
+    .input, select, textarea {
+      width: 100%;
+      background: #10141c;
+      color: var(--text);
+      border: 1px solid #30394b;
+      border-radius: 12px;
+      padding: 10px 12px;
+      outline: none;
+    }
+    .input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 10px;
+    }
+    .meta {
+      background: rgba(255,255,255,.03);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .meta .k { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+    .meta .v { font-size: 14px; word-break: break-word; }
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .tab {
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: #131824;
+      border: 1px solid #2f3849;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .tab.active {
+      color: var(--text);
+      border-color: var(--accent);
+      background: rgba(125,211,252,.11);
+    }
+    .preview-wrap {
+      display: grid;
+      grid-template-columns: minmax(240px, 1fr) 350px;
+      gap: 16px;
+      min-height: 0;
+    }
+    .preview {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 420px;
+      position: relative;
+      overflow: hidden;
+    }
+    .preview canvas {
+      max-width: 100%;
+      max-height: 75vh;
+      image-rendering: pixelated;
+      background: transparent;
+      touch-action: manipulation;
+    }
+    .panel {
+      padding: 14px;
+      background: var(--panel-2);
+      border-left: 1px solid var(--border);
+      overflow: auto;
+    }
+    .list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .item {
+      background: rgba(255,255,255,.03);
+      border: 1px solid #2c3443;
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .item h4 {
+      margin: 0 0 4px 0;
+      font-size: 14px;
+    }
+    .item .small, .small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 12px;
+    }
+    .asset-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 12px;
+    }
+    .thumb {
+      background: rgba(255,255,255,.03);
+      border: 1px solid #2b3343;
+      border-radius: 14px;
+      padding: 10px;
+    }
+    .thumb canvas, .thumb img {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: transparent;
+      image-rendering: pixelated;
+    }
+    .log {
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      background: #0b0e13;
+      border: 1px solid #273041;
+      border-radius: 14px;
+      padding: 12px;
+    }
+    .muted { color: var(--muted); }
+    .success { color: var(--ok); }
+    .danger { color: var(--danger); }
+    .checkboxes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+    .checkboxes label {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      background: rgba(255,255,255,.03);
+      border: 1px solid #2b3444;
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .checkboxes input { accent-color: var(--accent); }
+    .hidden { display: none !important; }
+    .footer-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      padding-top: 8px;
+    }
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; }
+      .preview-wrap { grid-template-columns: 1fr; }
+      .panel { border-left: 0; border-top: 1px solid var(--border); }
+    }
+    @media (max-width: 720px) {
+      .meta-grid, .split, .row { grid-template-columns: 1fr; }
+      .preview { min-height: 320px; }
+      .section { padding: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="card section">
+        <h1 class="title">ACS Web Inspector</h1>
+        <p class="subtitle">Microsoft Office Agent の ACS をブラウザ内で解析し、画像・音声・アニメーションを抽出します。<br>2.0 系の flat ACS を主対象にしています。1.5 系の OLE/CFB はストリーム一覧と生データ抽出を行います。</p>
+      </div><div class="card section stack">
+    <div class="dropzone" id="dropzone">
+      <div><strong>ACS ファイルをここにドロップ</strong></div>
+      <div class="small">または下のボタンから選択してください</div>
+    </div>
+    <div class="toolbar">
+      <label for="fileInput" class="btn primary" id="pickBtn" style="display:inline-flex;align-items:center;justify-content:center;">ファイルを選択</label>
+      <input id="fileInput" type="file" accept=".acs,.acf,.aca,.aaf,.cfb,application/octet-stream" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;" />
+      <button class="btn" id="sampleBtn" title="ヘッダだけ確認したい場合のダミー表示を消す">クリア</button>
+    </div>
+    <div class="toolbar">
+      <button class="btn good" id="exportGifBtn" disabled>選択アニメーションを GIF 書き出し</button>
+      <button class="btn good" id="exportZipBtn" disabled>ZIP でまとめて保存</button>
+    </div>
+    <div class="checkboxes">
+      <label><input type="checkbox" id="allGifsCheck"> 全アニメーション GIF を ZIP に含める</label>
+      <label><input type="checkbox" id="includeRawCheck" checked> 生データも ZIP に含める</label>
+    </div>
+    <div class="footer-note">スマホでも使えるように、操作面はタップ前提で大きめにしています。</div>
+  </div>
+
+  <div class="card section stack">
+    <div class="split">
+      <div>
+        <label class="small">アニメーション検索</label>
+        <input id="animSearch" class="input" placeholder="名前で絞り込み" disabled />
+      </div>
+      <div>
+        <label class="small">再生対象</label>
+        <select id="animSelect" class="input" disabled></select>
+      </div>
+    </div>
+    <div class="toolbar">
+      <button class="btn" id="playBtn" disabled>再生</button>
+      <button class="btn" id="stopBtn" disabled>停止</button>
+      <button class="btn" id="stepBtn" disabled>次フレーム</button>
+      <button class="btn" id="randomBtn" disabled>ランダム再生</button>
+    </div>
+    <div class="small muted" id="playbackHint">まだファイルは読み込まれていません。</div>
+  </div>
+
+  <div class="card section stack">
+    <div class="small">ログ</div>
+    <div class="log" id="log"></div>
+  </div>
+</aside>
+
+<main class="main">
+  <section class="card section">
+    <div class="meta-grid" id="metaGrid">
+      <div class="meta"><div class="k">状態</div><div class="v" id="statusText">待機中</div></div>
+      <div class="meta"><div class="k">ファイル名</div><div class="v" id="fileName">-</div></div>
+      <div class="meta"><div class="k">形式</div><div class="v" id="formatText">-</div></div>
+      <div class="meta"><div class="k">サイズ</div><div class="v" id="sizeText">-</div></div>
+    </div>
+  </section>
+
+  <section class="card section">
+    <div class="tabs">
+      <button class="tab active" data-tab="previewTab">プレビュー</button>
+      <button class="tab" data-tab="imagesTab">画像</button>
+      <button class="tab" data-tab="soundsTab">音声</button>
+      <button class="tab" data-tab="animationsTab">アニメーション</button>
+      <button class="tab" data-tab="rawTab">生データ</button>
+    </div>
+
+    <div id="previewTab" class="tabPage">
+      <div class="preview-wrap">
+        <div class="card preview">
+          <canvas id="previewCanvas" width="320" height="240"></canvas>
+        </div>
+        <div class="panel">
+          <div class="stack">
+            <div class="meta">
+              <div class="k">キャラクター情報</div>
+              <div class="v" id="charSummary">未読込</div>
+            </div>
+            <div class="meta">
+              <div class="k">ロケール名</div>
+              <div class="v" id="localizedSummary">-</div>
+            </div>
+            <div class="meta">
+              <div class="k">再生中のフレーム</div>
+              <div class="v" id="frameInfo">-</div>
+            </div>
+            <div class="meta">
+              <div class="k">備考</div>
+              <div class="v small" id="notesSummary">プレビューをクリックすると選択中アニメーションを再生します。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="imagesTab" class="tabPage hidden">
+      <div class="toolbar" style="margin-bottom:12px;">
+        <button class="btn" id="downloadAllImagesBtn" disabled>画像を一括保存</button>
+      </div>
+      <div class="asset-grid" id="imagesGrid"></div>
+    </div>
+
+    <div id="soundsTab" class="tabPage hidden">
+      <div class="toolbar" style="margin-bottom:12px;">
+        <button class="btn" id="downloadAllSoundsBtn" disabled>音声を一括保存</button>
+      </div>
+      <div class="asset-grid" id="soundsGrid"></div>
+    </div>
+
+    <div id="animationsTab" class="tabPage hidden">
+      <div class="toolbar" style="margin-bottom:12px;">
+        <button class="btn" id="downloadAnimJsonBtn" disabled>アニメーション JSON を保存</button>
+      </div>
+      <div class="list" id="animationsList"></div>
+    </div>
+
+    <div id="rawTab" class="tabPage hidden">
+      <div class="split">
+        <div>
+          <div class="small muted" style="margin-bottom:8px;">解析結果 JSON</div>
+          <textarea id="jsonDump" class="input" rows="18" readonly></textarea>
+        </div>
+        <div>
+          <div class="small muted" style="margin-bottom:8px;">OLE/CFB ストリーム一覧</div>
+          <div class="list" id="streamsList"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+  </div>  <script type="module">
+    const { default: JSZip } = await import('https://esm.sh/jszip@3.10.1');
+    const CFBModule = await import('https://esm.sh/cfb@1.2.3');
+    const GifEnc = await import('https://esm.sh/gifenc@1.0.3');
+
+    const CFB = CFBModule.default ?? CFBModule;
+    const { GIFEncoder, quantize, applyPalette } = GifEnc;
+
+    const $ = (id) => document.getElementById(id);
+    const logEl = $('log');
+    const canvas = $('previewCanvas');
+    const ctx = canvas.getContext('2d');
+    const offCanvas = document.createElement('canvas');
+    const offCtx = offCanvas.getContext('2d');
+
+    const state = {
+      file: null,
+      fileName: '',
+      bytes: null,
+      parsed: null,
+      resources: [],
+      selectedAnimationIndex: 0,
+      currentFrameIndex: 0,
+      playing: false,
+      timer: null,
+      tabs: new Set(['previewTab']),
+      objectUrls: new Set(),
+      streamEntries: [],
+      isCFB: false,
+      initialized: false,
+    };
+
+    const ui = {
+      statusText: $('statusText'),
+      fileName: $('fileName'),
+      formatText: $('formatText'),
+      sizeText: $('sizeText'),
+      charSummary: $('charSummary'),
+      localizedSummary: $('localizedSummary'),
+      frameInfo: $('frameInfo'),
+      notesSummary: $('notesSummary'),
+      jsonDump: $('jsonDump'),
+      imagesGrid: $('imagesGrid'),
+      soundsGrid: $('soundsGrid'),
+      animationsList: $('animationsList'),
+      streamsList: $('streamsList'),
+      animSelect: $('animSelect'),
+      animSearch: $('animSearch'),
+      exportGifBtn: $('exportGifBtn'),
+      exportZipBtn: $('exportZipBtn'),
+      downloadAllImagesBtn: $('downloadAllImagesBtn'),
+      downloadAllSoundsBtn: $('downloadAllSoundsBtn'),
+      downloadAnimJsonBtn: $('downloadAnimJsonBtn'),
+      playBtn: $('playBtn'),
+      stopBtn: $('stopBtn'),
+      stepBtn: $('stepBtn'),
+      randomBtn: $('randomBtn'),
+      playbackHint: $('playbackHint'),
+      allGifsCheck: $('allGifsCheck'),
+      includeRawCheck: $('includeRawCheck'),
+    };
+
+    function setStatus(text, kind = '') {
+      ui.statusText.textContent = text;
+      ui.statusText.className = 'v' + (kind ? ` ${kind}` : '');
+    }
+
+    function log(...parts) {
+      const line = parts.map(p => typeof p === 'string' ? p : JSON.stringify(p, null, 2)).join(' ');
+      logEl.textContent += line + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+      console.log(...parts);
+    }
+
+    function clearLog() { logEl.textContent = ''; }
+
+    function bytesToSize(n) {
+      if (!Number.isFinite(n)) return '-';
+      const units = ['B','KB','MB','GB'];
+      let i = 0, v = n;
+      while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+      return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+    }
+
+    function sanitizeName(name) {
+      return String(name || 'unnamed').replace(/[\\/:*?"<>|\x00-\x1F]/g, '_').replace(/\s+/g, ' ').trim() || 'unnamed';
+    }
+
+    function u8(buf) {
+      return buf instanceof Uint8Array ? buf : new Uint8Array(buf);
+    }
+
+    function concatU8(chunks) {
+      const total = chunks.reduce((a, c) => a + c.length, 0);
+      const out = new Uint8Array(total);
+      let p = 0;
+      for (const c of chunks) { out.set(c, p); p += c.length; }
+      return out;
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob);
+      state.objectUrls.add(url);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+        state.objectUrls.delete(url);
+      }, 5000);
+    }
+
+    function toDataURLFromBytes(bytes, mime = 'application/octet-stream') {
+      const blob = new Blob([bytes], { type: mime });
+      const url = URL.createObjectURL(blob);
+      state.objectUrls.add(url);
+      return url;
+    }
+
+    function bufferEqualsPrefix(bytes, sig) {
+      if (bytes.length < sig.length) return false;
+      for (let i = 0; i < sig.length; i++) if (bytes[i] !== sig[i]) return false;
+      return true;
+    }
+
+    function detectMime(bytes) {
+      if (bufferEqualsPrefix(bytes, [0x52, 0x49, 0x46, 0x46])) return 'audio/wav';
+      if (bufferEqualsPrefix(bytes, [0x49, 0x44, 0x33])) return 'audio/mpeg';
+      if (bufferEqualsPrefix(bytes, [0x4F, 0x67, 0x67, 0x53])) return 'audio/ogg';
+      if (bufferEqualsPrefix(bytes, [0x66, 0x4C, 0x61, 0x43])) return 'audio/flac';
+      if (bufferEqualsPrefix(bytes, [0x89, 0x50, 0x4E, 0x47])) return 'image/png';
+      if (bufferEqualsPrefix(bytes, [0x47, 0x49, 0x46, 0x38])) return 'image/gif';
+      if (bufferEqualsPrefix(bytes, [0x42, 0x4D])) return 'image/bmp';
+      if (bufferEqualsPrefix(bytes, [0xFF, 0xD8, 0xFF])) return 'image/jpeg';
+      return 'application/octet-stream';
+    }
+
+    class Reader {
+      constructor(bytes) {
+        this.bytes = u8(bytes);
+        this.dv = new DataView(this.bytes.buffer, this.bytes.byteOffset, this.bytes.byteLength);
+        this.td = new TextDecoder('utf-16le');
+      }
+      check(offset, size) {
+        if (offset + size > this.bytes.length) throw new Error(`範囲外読み取り: ${offset}+${size} > ${this.bytes.length}`);
+      }
+      u8(offset) { this.check(offset, 1); return this.dv.getUint8(offset); }
+      i8(offset) { this.check(offset, 1); return this.dv.getInt8(offset); }
+      u16(offset) { this.check(offset, 2); return this.dv.getUint16(offset, true); }
+      i16(offset) { this.check(offset, 2); return this.dv.getInt16(offset, true); }
+      u32(offset) { this.check(offset, 4); return this.dv.getUint32(offset, true); }
+      i32(offset) { this.check(offset, 4); return this.dv.getInt32(offset, true); }
+      guid(offset) {
+        this.check(offset, 16);
+        const b = this.bytes.slice(offset, offset + 16);
+        const hex = [...b].map(x => x.toString(16).padStart(2, '0'));
+        return `${hex.slice(3,4)}${hex.slice(2,3)}${hex.slice(1,2)}${hex.slice(0,1)}-${hex.slice(5,6)}${hex.slice(4,5)}-${hex.slice(7,8)}${hex.slice(6,7)}-${hex.slice(8,10).join('')}-${hex.slice(10,16).join('')}`;
+      }
+      string(offset) {
+        const numChars = this.u32(offset);
+        const size = 4 + numChars * 2 + (numChars ? 2 : 0);
+        this.check(offset, size);
+        const data = this.bytes.slice(offset + 4, offset + 4 + numChars * 2);
+        return { value: this.td.decode(data), size };
+      }
+      datablock(offset) {
+        const payloadSize = this.u32(offset);
+        const size = payloadSize + 4;
+        this.check(offset, size);
+        return { value: this.bytes.slice(offset + 4, offset + 4 + payloadSize), size };
+      }
+      rect(offset) {
+        return {
+          value: { x1: this.i32(offset), y1: this.i32(offset + 4), x2: this.i32(offset + 8), y2: this.i32(offset + 12) },
+          size: 16,
+        };
+      }
+      rgbquad(offset) {
+        return {
+          value: { r: this.u8(offset), g: this.u8(offset + 1), b: this.u8(offset + 2), a: this.u8(offset + 3) },
+          size: 4,
+        };
+      }
+      list(offset, countValue, countSize, parser, structSizeFn) {
+        const start = offset;
+        const count = typeof countValue === 'function' ? countValue(offset) : countValue;
+        const headerSize = typeof countSize === 'function' ? countSize(count) : countSize;
+        offset += headerSize;
+        const out = [];
+        for (let i = 0; i < count; i++) {
+          const item = parser(offset);
+          o
