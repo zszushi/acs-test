@@ -1,602 +1,4060 @@
-<!DOCTYPE html><html lang="ja">
+<!DOCTYPE html>
+<html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ACS Web Inspector / Extractor</title>
-  <style>
-    :root {
-      color-scheme: dark;
-      --bg: #0f1115;
-      --panel: #171a21;
-      --panel-2: #1f2430;
-      --border: #2d3442;
-      --text: #eef2ff;
-      --muted: #aeb6c9;
-      --accent: #7dd3fc;
-      --accent-2: #c4b5fd;
-      --danger: #f87171;
-      --ok: #34d399;
-      --shadow: 0 12px 40px rgba(0,0,0,.35);
-      --radius: 18px;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(1200px 700px at 20% 0%, #182033 0%, var(--bg) 60%);
-      color: var(--text);
-    }
-    a { color: var(--accent); }
-    button, input, select, textarea {
-      font: inherit;
-    }
-    .app {
-      min-height: 100vh;
-      display: grid;
-      grid-template-columns: 380px 1fr;
-      gap: 16px;
-      padding: 16px;
-    }
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow: hidden;
-    }
-    .sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      min-width: 0;
-    }
-    .main {
-      display: grid;
-      grid-template-rows: auto auto 1fr;
-      gap: 16px;
-      min-width: 0;
-    }
-    .section {
-      padding: 16px;
-    }
-    .title {
-      font-size: 22px;
-      font-weight: 800;
-      letter-spacing: .02em;
-      margin: 0 0 6px 0;
-    }
-    .subtitle {
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.5;
-      margin: 0;
-    }
-    .dropzone {
-      border: 1.5px dashed #44506a;
-      border-radius: 16px;
-      padding: 18px;
-      text-align: center;
-      background: rgba(255,255,255,.02);
-      transition: .18s ease;
-    }
-    .dropzone.dragover {
-      border-color: var(--accent);
-      background: rgba(125, 211, 252, .08);
-      transform: scale(1.01);
-    }
-    .row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .stack { display: flex; flex-direction: column; gap: 10px; }
-    .toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-    }
-    .toolbar > * { flex: 0 0 auto; }
-    .btn {
-      background: linear-gradient(180deg, #2a3140, #222938);
-      color: var(--text);
-      border: 1px solid #384356;
-      border-radius: 14px;
-      padding: 10px 14px;
-      cursor: pointer;
-      transition: .15s ease;
-      user-select: none;
-    }
-    .btn:hover { border-color: #5a6b8f; transform: translateY(-1px); }
-    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
-    .btn.primary { background: linear-gradient(180deg, #173a4f, #102735); border-color: #2c6d8e; }
-    .btn.good { background: linear-gradient(180deg, #114136, #0c2d26); border-color: #1f6b58; }
-    .btn.warn { background: linear-gradient(180deg, #4b2419, #311813); border-color: #7b3c29; }
-    .input, select, textarea {
-      width: 100%;
-      background: #10141c;
-      color: var(--text);
-      border: 1px solid #30394b;
-      border-radius: 12px;
-      padding: 10px 12px;
-      outline: none;
-    }
-    .input:focus, select:focus, textarea:focus { border-color: var(--accent); }
-    .meta-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0,1fr));
-      gap: 10px;
-    }
-    .meta {
-      background: rgba(255,255,255,.03);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 12px;
-    }
-    .meta .k { color: var(--muted); font-size: 12px; margin-bottom: 6px; }
-    .meta .v { font-size: 14px; word-break: break-word; }
-    .tabs {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-bottom: 12px;
-    }
-    .tab {
-      border-radius: 999px;
-      padding: 8px 12px;
-      background: #131824;
-      border: 1px solid #2f3849;
-      color: var(--muted);
-      cursor: pointer;
-    }
-    .tab.active {
-      color: var(--text);
-      border-color: var(--accent);
-      background: rgba(125,211,252,.11);
-    }
-    .preview-wrap {
-      display: grid;
-      grid-template-columns: minmax(240px, 1fr) 350px;
-      gap: 16px;
-      min-height: 0;
-    }
-    .preview {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 420px;
-      position: relative;
-      overflow: hidden;
-    }
-    .preview canvas {
-      max-width: 100%;
-      max-height: 75vh;
-      image-rendering: pixelated;
-      background: transparent;
-      touch-action: manipulation;
-    }
-    .panel {
-      padding: 14px;
-      background: var(--panel-2);
-      border-left: 1px solid var(--border);
-      overflow: auto;
-    }
-    .list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .item {
-      background: rgba(255,255,255,.03);
-      border: 1px solid #2c3443;
-      border-radius: 14px;
-      padding: 12px;
-    }
-    .item h4 {
-      margin: 0 0 4px 0;
-      font-size: 14px;
-    }
-    .item .small, .small { color: var(--muted); font-size: 12px; line-height: 1.45; }
-    .split {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0,1fr));
-      gap: 12px;
-    }
-    .asset-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 12px;
-    }
-    .thumb {
-      background: rgba(255,255,255,.03);
-      border: 1px solid #2b3343;
-      border-radius: 14px;
-      padding: 10px;
-    }
-    .thumb canvas, .thumb img {
-      width: 100%;
-      height: auto;
-      display: block;
-      background: transparent;
-      image-rendering: pixelated;
-    }
-    .log {
-      max-height: 180px;
-      overflow: auto;
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-      background: #0b0e13;
-      border: 1px solid #273041;
-      border-radius: 14px;
-      padding: 12px;
-    }
-    .muted { color: var(--muted); }
-    .success { color: var(--ok); }
-    .danger { color: var(--danger); }
-    .checkboxes {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-    }
-    .checkboxes label {
-      display: inline-flex;
-      gap: 8px;
-      align-items: center;
-      background: rgba(255,255,255,.03);
-      border: 1px solid #2b3444;
-      border-radius: 999px;
-      padding: 8px 12px;
-      cursor: pointer;
-    }
-    .checkboxes input { accent-color: var(--accent); }
-    .hidden { display: none !important; }
-    .footer-note {
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.5;
-      padding-top: 8px;
-    }
-    @media (max-width: 1100px) {
-      .app { grid-template-columns: 1fr; }
-      .preview-wrap { grid-template-columns: 1fr; }
-      .panel { border-left: 0; border-top: 1px solid var(--border); }
-    }
-    @media (max-width: 720px) {
-      .meta-grid, .split, .row { grid-template-columns: 1fr; }
-      .preview { min-height: 320px; }
-      .section { padding: 14px; }
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACS Explorer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;500;600;700;800&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a26;
+    --border: #2a2a3e;
+    --accent: #7c6af7;
+    --accent2: #4fc3f7;
+    --accent3: #f06292;
+    --text: #e8e8f0;
+    --text-dim: #7a7a9a;
+    --text-dimmer: #3a3a5a;
+    --green: #69f0ae;
+    --orange: #ffb74d;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ── */
+  header {
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.3rem;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent); }
+  .version-tag {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    background: var(--border);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  header .spacer { flex: 1; }
+  .status-bar {
+    font-size: 0.7rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--text-dimmer);
+  }
+  .status-dot.active { background: var(--green); box-shadow: 0 0 6px var(--green); }
+
+  /* ── Layout ── */
+  .app {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    grid-template-rows: 1fr;
+    height: calc(100vh - 57px);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface);
+    min-height: 0;
+  }
+  .sidebar-section {
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+  }
+  .sidebar-label {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-dimmer);
+    margin-bottom: 8px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+  }
+  .drop-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: 8px;
+    padding: 20px 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .drop-zone:hover, .drop-zone.over {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.06);
+  }
+  .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .drop-icon { font-size: 1.8rem; margin-bottom: 6px; }
+  .drop-text { font-size: 0.7rem; color: var(--text-dim); line-height: 1.4; }
+  .drop-text strong { color: var(--accent); }
+
+  .anim-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+  .anim-list::-webkit-scrollbar { width: 4px; }
+  .anim-list::-webkit-scrollbar-track { background: transparent; }
+  .anim-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .anim-item {
+    padding: 7px 16px;
+    font-size: 0.72rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+    transition: all 0.15s;
+    border-left: 2px solid transparent;
+  }
+  .anim-item:hover { background: rgba(255,255,255,0.03); color: var(--text); }
+  .anim-item.active {
+    background: rgba(124,106,247,0.1);
+    color: var(--accent);
+    border-left-color: var(--accent);
+  }
+  .anim-item.pattern-item {
+    padding-left: 34px;
+    font-size: 0.66rem;
+  }
+  .anim-item.pattern-item .anim-icon {
+    opacity: 0.45;
+  }
+  .anim-item .anim-icon { font-size: 0.7rem; opacity: 0.6; }
+  .anim-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .anim-frames {
+    font-size: 0.6rem;
+    color: var(--text-dimmer);
+    background: var(--surface2);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .char-info {
+    padding: 12px 16px;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+    border-top: 1px solid var(--border);
+    max-height: 34vh;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  .char-info .info-row { display: flex; justify-content: space-between; }
+  .char-info .info-val { color: var(--text); }
+
+  /* ── Main area ── */
+  .main {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    padding: 0 20px;
+    gap: 0;
+    overflow-x: auto;
+    flex-shrink: 0;
+  }
+  .tab {
+    padding: 12px 18px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    font-family: 'Syne', sans-serif;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Tab content panels ── */
+  .tab-content { flex: 1; overflow: hidden; display: none; flex-direction: column; }
+  .tab-content.active { display: flex; }
+
+  /* ── Viewer tab ── */
+  .viewer-layout {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .canvas-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    position: relative;
+    overflow: auto;
+    gap: 16px;
+    min-width: 0;
+    min-height: 0;
+    padding: 16px;
+  }
+  /* Checkerboard background for canvas */
+  .canvas-area::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(45deg, #1a1a22 25%, transparent 25%),
+      linear-gradient(-45deg, #1a1a22 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #1a1a22 75%),
+      linear-gradient(-45deg, transparent 75%, #1a1a22 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+    opacity: 0.6;
+  }
+  .canvas-wrap {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    background: transparent;
+    flex: 0 0 auto;
+  }
+  #mainCanvas {
+    display: block;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+  .playback-bar {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    flex: 0 0 auto;
+  }
+  .btn {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn.primary:hover { opacity: 0.85; }
+  .btn.danger { border-color: var(--accent3); color: var(--accent3); }
+  .btn.danger:hover { background: rgba(240,98,146,0.1); }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .frame-counter {
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    min-width: 70px;
+    text-align: center;
+  }
+  .duration-info {
+    font-size: 0.65rem;
+    color: var(--text-dimmer);
+  }
+
+  /* ── Right panel ── */
+  .right-panel {
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--surface);
+    min-height: 0;
+  }
+  .panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.68rem;
+    color: var(--text-dim);
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .pattern-panel {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 12px;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .pattern-panel.visible { display: flex; }
+  .pattern-title {
+    font-size: 0.58rem;
+    color: var(--text-dimmer);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+  }
+  .pattern-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .pattern-chip {
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--text-dim);
+    border-radius: 4px;
+    padding: 6px 8px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    text-align: left;
+    line-height: 1.35;
+  }
+  .pattern-chip:hover,
+  .pattern-chip.active {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(124,106,247,0.1);
+  }
+  .pattern-chip small {
+    display: block;
+    color: var(--text-dimmer);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .frame-strip {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+  }
+  .frame-strip::-webkit-scrollbar { width: 4px; }
+  .frame-strip::-webkit-scrollbar-thumb { background: var(--border); }
+  .frame-thumb {
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: var(--surface2);
+  }
+  .frame-thumb:hover { border-color: var(--accent2); }
+  .frame-thumb.active { border-color: var(--accent); background: rgba(124,106,247,0.1); }
+  .frame-thumb canvas {
+    width: 48px; height: 48px;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+    background: transparent;
+    border-radius: 2px;
+  }
+  .frame-meta {
+    flex: 1;
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+  .frame-meta .f-idx { color: var(--text); font-weight: 500; }
+
+  .audio-row {
+    border-top: 1px solid var(--border);
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+  }
+  .audio-indicator {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--orange);
+    box-shadow: 0 0 6px var(--orange);
+  }
+  .audio-indicator.silent { background: var(--text-dimmer); box-shadow: none; }
+
+  /* ── Export tab ── */
+  .export-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  .export-card {
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: all 0.2s;
+  }
+  .export-card:hover { border-color: var(--accent); background: rgba(124,106,247,0.04); }
+  .export-card-icon { font-size: 1.8rem; }
+  .export-card-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+  }
+  .export-card-desc { font-size: 0.68rem; color: var(--text-dim); line-height: 1.4; }
+  .export-options { display: flex; flex-direction: column; gap: 6px; }
+  .export-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+  }
+  .export-option label { cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    cursor: pointer;
+    outline: none;
+  }
+  input[type=range] {
+    accent-color: var(--accent);
+    width: 100%;
+  }
+  input[type=number] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    width: 60px;
+    outline: none;
+  }
+
+  .export-section-header {
+    padding: 16px 20px 4px;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--text-dimmer);
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+  }
+
+  /* ── Audio tab ── */
+  .audio-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .audio-item {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.15s;
+  }
+  .audio-item:hover { border-color: var(--orange); }
+  .audio-item-icon { font-size: 1.2rem; }
+  .audio-item-info { flex: 1; }
+  .audio-item-name { font-size: 0.75rem; color: var(--text); margin-bottom: 2px; }
+  .audio-item-meta { font-size: 0.63rem; color: var(--text-dim); }
+  .audio-item-actions { display: flex; gap: 6px; }
+
+  /* ── Progress overlay ── */
+  .progress-overlay {
+    position: fixed; inset: 0;
+    background: rgba(10,10,15,0.85);
+    backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    gap: 16px;
+    display: none;
+  }
+  .progress-overlay.active { display: flex; }
+  .progress-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+  }
+  .progress-bar-wrap {
+    width: 300px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.1s;
+    width: 0%;
+  }
+  .progress-msg { font-size: 0.72rem; color: var(--text-dim); }
+
+  /* ── Empty states ── */
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-dimmer);
+  }
+  .empty-state .empty-icon { font-size: 3rem; opacity: 0.3; }
+  .empty-state .empty-title { font-family: 'Syne', sans-serif; font-size: 0.9rem; font-weight: 600; }
+  .empty-state .empty-desc { font-size: 0.7rem; text-align: center; max-width: 240px; line-height: 1.5; }
+
+  /* ── Toast ── */
+  .toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 2000;
+  }
+  .toast {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 0.72rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: slideIn 0.2s ease;
+    max-width: 320px;
+  }
+  .toast.success { border-color: var(--green); }
+  .toast.error { border-color: var(--accent3); }
+  @keyframes slideIn {
+    from { transform: translateX(20px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  /* Speed slider label */
+  .speed-label { min-width: 35px; text-align: right; }
+
+  /* ── Scrollable tab panel inner ── */
+  .scroll-inner {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding: 20px;
+  }
+  .scroll-inner::-webkit-scrollbar { width: 4px; }
+  .scroll-inner::-webkit-scrollbar-thumb { background: var(--border); }
+
+  /* Search box */
+  .search-wrap {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .search-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-input:focus { border-color: var(--accent); }
+  .search-input::placeholder { color: var(--text-dimmer); }
+
+  #exportContent,
+  #imagesGrid,
+  #overviewContent {
+    min-height: 0;
+  }
+
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .overview-panel {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .overview-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.76rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 10px;
+  }
+  .kv-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 3px 0;
+    font-size: 0.68rem;
+    color: var(--text-dim);
+  }
+  .kv-row span:last-child {
+    color: var(--text);
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+  .locale-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.66rem;
+  }
+  .locale-table th,
+  .locale-table td {
+    border-bottom: 1px solid var(--border);
+    padding: 7px 6px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .locale-table th {
+    color: var(--text-dimmer);
+    font-family: 'Syne', sans-serif;
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .locale-table td {
+    color: var(--text-dim);
+  }
+  .locale-table .preferred td {
+    color: var(--text);
+    background: rgba(124,106,247,0.08);
+  }
+  .state-list {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    max-height: 360px;
+    overflow-y: auto;
+  }
+  .state-entry {
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    line-height: 1.45;
+  }
+  .state-entry strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+  .branch-entry {
+    border-top: 1px solid var(--border);
+    padding: 9px 0;
+    font-size: 0.66rem;
+    color: var(--text-dim);
+  }
+  .branch-entry:first-child { border-top: 0; padding-top: 0; }
+  .branch-entry strong { color: var(--text); }
+  .branch-entry pre {
+    margin-top: 6px;
+    white-space: pre-wrap;
+    color: var(--text-dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    line-height: 1.45;
+  }
+  .pattern-summary {
+    margin-top: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .pattern-summary div {
+    color: var(--text-dimmer);
+    overflow-wrap: anywhere;
+  }
+</style>
 </head>
 <body>
-  <div class="app">
-    <aside class="sidebar">
-      <div class="card section">
-        <h1 class="title">ACS Web Inspector</h1>
-        <p class="subtitle">Microsoft Office Agent の ACS をブラウザ内で解析し、画像・音声・アニメーションを抽出します。<br>2.0 系の flat ACS を主対象にしています。1.5 系の OLE/CFB はストリーム一覧と生データ抽出を行います。</p>
-      </div><div class="card section stack">
-    <div class="dropzone" id="dropzone">
-      <div><strong>ACS ファイルをここにドロップ</strong></div>
-      <div class="small">または下のボタンから選択してください</div>
-    </div>
-    <div class="toolbar">
-      <label for="fileInput" class="btn primary" id="pickBtn" style="display:inline-flex;align-items:center;justify-content:center;">ファイルを選択</label>
-      <input id="fileInput" type="file" accept=".acs,.acf,.aca,.aaf,.cfb,application/octet-stream" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;" />
-      <button class="btn" id="sampleBtn" title="ヘッダだけ確認したい場合のダミー表示を消す">クリア</button>
-    </div>
-    <div class="toolbar">
-      <button class="btn good" id="exportGifBtn" disabled>選択アニメーションを GIF 書き出し</button>
-      <button class="btn good" id="exportZipBtn" disabled>ZIP でまとめて保存</button>
-    </div>
-    <div class="checkboxes">
-      <label><input type="checkbox" id="allGifsCheck"> 全アニメーション GIF を ZIP に含める</label>
-      <label><input type="checkbox" id="includeRawCheck" checked> 生データも ZIP に含める</label>
-    </div>
-    <div class="footer-note">スマホでも使えるように、操作面はタップ前提で大きめにしています。</div>
-  </div>
 
-  <div class="card section stack">
-    <div class="split">
-      <div>
-        <label class="small">アニメーション検索</label>
-        <input id="animSearch" class="input" placeholder="名前で絞り込み" disabled />
-      </div>
-      <div>
-        <label class="small">再生対象</label>
-        <select id="animSelect" class="input" disabled></select>
+<header>
+  <div class="logo">ACS<span>.</span>Explorer</div>
+  <div class="version-tag">v1.0</div>
+  <div class="spacer"></div>
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">ファイルを読み込んでください</span>
+  </div>
+</header>
+
+<div class="app">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">ACS / ACG ファイル</div>
+      <div class="drop-zone" id="dropZone">
+        <input type="file" accept=".acs,.acg" id="fileInput">
+        <div class="drop-icon">🎭</div>
+        <div class="drop-text"><strong>クリックまたはドロップ</strong><br>.acs / .acg ファイルを選択</div>
       </div>
     </div>
-    <div class="toolbar">
-      <button class="btn" id="playBtn" disabled>再生</button>
-      <button class="btn" id="stopBtn" disabled>停止</button>
-      <button class="btn" id="stepBtn" disabled>次フレーム</button>
-      <button class="btn" id="randomBtn" disabled>ランダム再生</button>
+
+    <div class="search-wrap">
+      <input type="text" class="search-input" id="searchInput" placeholder="アニメーションを検索...">
     </div>
-    <div class="small muted" id="playbackHint">まだファイルは読み込まれていません。</div>
-  </div>
 
-  <div class="card section stack">
-    <div class="small">ログ</div>
-    <div class="log" id="log"></div>
-  </div>
-</aside>
-
-<main class="main">
-  <section class="card section">
-    <div class="meta-grid" id="metaGrid">
-      <div class="meta"><div class="k">状態</div><div class="v" id="statusText">待機中</div></div>
-      <div class="meta"><div class="k">ファイル名</div><div class="v" id="fileName">-</div></div>
-      <div class="meta"><div class="k">形式</div><div class="v" id="formatText">-</div></div>
-      <div class="meta"><div class="k">サイズ</div><div class="v" id="sizeText">-</div></div>
+    <div class="anim-list" id="animList">
+      <div class="empty-state" style="padding:20px">
+        <div class="empty-icon" style="font-size:1.5rem">📂</div>
+        <div class="empty-desc">ファイルを読み込むとアニメーション一覧が表示されます</div>
+      </div>
     </div>
-  </section>
 
-  <section class="card section">
+    <div class="char-info" id="charInfo" style="display:none">
+      <div class="sidebar-label">キャラクター情報</div>
+      <div id="charInfoContent"></div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
     <div class="tabs">
-      <button class="tab active" data-tab="previewTab">プレビュー</button>
-      <button class="tab" data-tab="imagesTab">画像</button>
-      <button class="tab" data-tab="soundsTab">音声</button>
-      <button class="tab" data-tab="animationsTab">アニメーション</button>
-      <button class="tab" data-tab="rawTab">生データ</button>
+      <div class="tab active" data-tab="viewer">▶ プレビュー</div>
+      <div class="tab" data-tab="overview">ⓘ 概要</div>
+      <div class="tab" data-tab="export">⬇ エクスポート</div>
+      <div class="tab" data-tab="audio">♪ 音声</div>
+      <div class="tab" data-tab="images">🖼 フレーム画像</div>
     </div>
 
-    <div id="previewTab" class="tabPage">
-      <div class="preview-wrap">
-        <div class="card preview">
-          <canvas id="previewCanvas" width="320" height="240"></canvas>
+    <!-- Viewer Tab -->
+    <div class="tab-content active" id="tab-viewer">
+      <div id="viewerEmpty" class="empty-state">
+        <div class="empty-icon">🎬</div>
+        <div class="empty-title">アニメーションを選択</div>
+        <div class="empty-desc">左のリストからアニメーションをクリックして再生します</div>
+      </div>
+      <div class="viewer-layout" id="viewerLayout" style="display:none">
+        <div class="canvas-area">
+          <div class="canvas-wrap" id="canvasWrap">
+            <canvas id="mainCanvas"></canvas>
+          </div>
+          <div class="playback-bar">
+            <button class="btn" id="btnPlay">▶ 再生</button>
+            <button class="btn" id="btnStop">■ 停止</button>
+            <div class="frame-counter" id="frameCounter">- / -</div>
+            <span style="font-size:0.65rem;color:var(--text-dimmer)">表示</span>
+            <select id="previewScale">
+              <option value="1">1x</option>
+              <option value="2" selected>2x</option>
+              <option value="4">4x</option>
+            </select>
+            <span style="font-size:0.65rem;color:var(--text-dimmer)">速度</span>
+            <input type="range" min="0.1" max="4" step="0.1" value="1" id="speedSlider" style="width:80px">
+            <span class="speed-label" id="speedLabel">1.0x</span>
+          </div>
         </div>
-        <div class="panel">
-          <div class="stack">
-            <div class="meta">
-              <div class="k">キャラクター情報</div>
-              <div class="v" id="charSummary">未読込</div>
-            </div>
-            <div class="meta">
-              <div class="k">ロケール名</div>
-              <div class="v" id="localizedSummary">-</div>
-            </div>
-            <div class="meta">
-              <div class="k">再生中のフレーム</div>
-              <div class="v" id="frameInfo">-</div>
-            </div>
-            <div class="meta">
-              <div class="k">備考</div>
-              <div class="v small" id="notesSummary">プレビューをクリックすると選択中アニメーションを再生します。</div>
-            </div>
+        <div class="right-panel">
+          <div class="pattern-panel" id="patternPanel">
+            <div class="pattern-title">パターン</div>
+            <div class="pattern-list" id="patternList"></div>
+          </div>
+          <div class="panel-header">
+            <span>フレーム</span>
+            <span id="frameCount" style="color:var(--accent);font-size:0.75rem"></span>
+          </div>
+          <div class="frame-strip" id="frameStrip"></div>
+          <div class="audio-row" id="audioRow">
+            <div class="audio-indicator silent" id="audioIndicator"></div>
+            <span id="audioStatus">音声なし</span>
           </div>
         </div>
       </div>
     </div>
 
-    <div id="imagesTab" class="tabPage hidden">
-      <div class="toolbar" style="margin-bottom:12px;">
-        <button class="btn" id="downloadAllImagesBtn" disabled>画像を一括保存</button>
+    <!-- Overview Tab -->
+    <div class="tab-content" id="tab-overview">
+      <div id="overviewEmpty" class="empty-state">
+        <div class="empty-icon">ⓘ</div>
+        <div class="empty-title">ファイル概要</div>
+        <div class="empty-desc">ACSファイルを読み込むとロケール別情報や状態一覧が表示されます</div>
       </div>
-      <div class="asset-grid" id="imagesGrid"></div>
+      <div id="overviewContent" class="scroll-inner" style="display:none"></div>
     </div>
 
-    <div id="soundsTab" class="tabPage hidden">
-      <div class="toolbar" style="margin-bottom:12px;">
-        <button class="btn" id="downloadAllSoundsBtn" disabled>音声を一括保存</button>
+    <!-- Export Tab -->
+    <div class="tab-content" id="tab-export">
+      <div id="exportEmpty" class="empty-state">
+        <div class="empty-icon">⬇</div>
+        <div class="empty-title">エクスポート</div>
+        <div class="empty-desc">ACSファイルを読み込んでからエクスポートしてください</div>
       </div>
-      <div class="asset-grid" id="soundsGrid"></div>
-    </div>
+      <div id="exportContent" style="display:none; overflow-y:auto; flex:1">
+        <div class="export-section-header">アニメーション書き出し（選択中）</div>
+        <div class="export-grid">
+          <!-- GIF Card -->
+          <div class="export-card">
+            <div class="export-card-icon">🎞</div>
+            <div class="export-card-title">GIF アニメーション</div>
+            <div class="export-card-desc">選択中のアニメーションをアニメーションGIFで書き出し</div>
+            <div class="export-options">
+              <div class="export-option">
+                <label>スケール:
+                  <select id="gifScale">
+                    <option value="1">1x (等倍)</option>
+                    <option value="2" selected>2x</option>
+                    <option value="3">3x</option>
+                    <option value="4">4x</option>
+                  </select>
+                </label>
+              </div>
+              <div class="export-option">
+                <label>ループ:
+                  <select id="gifLoop">
+                    <option value="0">無限ループ</option>
+                    <option value="1">1回</option>
+                    <option value="3">3回</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <button class="btn primary" onclick="exportGIF()">GIF 書き出し</button>
+          </div>
 
-    <div id="animationsTab" class="tabPage hidden">
-      <div class="toolbar" style="margin-bottom:12px;">
-        <button class="btn" id="downloadAnimJsonBtn" disabled>アニメーション JSON を保存</button>
-      </div>
-      <div class="list" id="animationsList"></div>
-    </div>
+          <!-- PNG Sequence Card -->
+          <div class="export-card">
+            <div class="export-card-icon">🖼</div>
+            <div class="export-card-title">PNG シーケンス</div>
+            <div class="export-card-desc">フレームを個別のPNG画像としてZIPで書き出し</div>
+            <div class="export-options">
+              <div class="export-option">
+                <label>スケール:
+                  <select id="pngScale">
+                    <option value="1">1x (等倍)</option>
+                    <option value="2" selected>2x</option>
+                    <option value="4">4x</option>
+                  </select>
+                </label>
+              </div>
+              <div class="export-option">
+                <label><input type="checkbox" id="pngTransparent" checked> 透明背景</label>
+              </div>
+            </div>
+            <button class="btn primary" onclick="exportPNGSequence()">PNG ZIP 書き出し</button>
+          </div>
 
-    <div id="rawTab" class="tabPage hidden">
-      <div class="split">
-        <div>
-          <div class="small muted" style="margin-bottom:8px;">解析結果 JSON</div>
-          <textarea id="jsonDump" class="input" rows="18" readonly></textarea>
+          <!-- WebP Card -->
+          <div class="export-card">
+            <div class="export-card-icon">🌐</div>
+            <div class="export-card-title">WebP アニメーション</div>
+            <div class="export-card-desc">選択中のアニメーションをWebPで書き出し（Canvas API経由）</div>
+            <div class="export-options">
+              <div class="export-option">
+                <label>品質:
+                  <input type="range" min="0.5" max="1" step="0.05" value="0.92" id="webpQuality">
+                  <span id="webpQualityLabel">0.92</span>
+                </label>
+              </div>
+              <div class="export-option">
+                <label>スケール:
+                  <select id="webpScale">
+                    <option value="1">1x</option>
+                    <option value="2" selected>2x</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <button class="btn primary" onclick="exportWebPFrames()">WebP ZIP 書き出し</button>
+          </div>
+
+          <!-- Video Card -->
+          <div class="export-card">
+            <div class="export-card-icon">🎬</div>
+            <div class="export-card-title">動画 + 音声</div>
+            <div class="export-card-desc">選択中のアニメーションを音声付きWebM/MP4で書き出し</div>
+            <div class="export-options">
+              <div class="export-option">
+                <label>形式:
+                  <select id="videoFormat">
+                    <option value="webm" selected>WebM</option>
+                    <option value="mp4">MP4</option>
+                  </select>
+                </label>
+              </div>
+              <div class="export-option">
+                <label>スケール:
+                  <select id="videoScale">
+                    <option value="1">1x</option>
+                    <option value="2" selected>2x</option>
+                    <option value="4">4x</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <button class="btn primary" onclick="exportVideo()">動画 書き出し</button>
+          </div>
+
+          <!-- Spritesheet Card -->
+          <div class="export-card">
+            <div class="export-card-icon">📋</div>
+            <div class="export-card-title">スプライトシート</div>
+            <div class="export-card-desc">全フレームを1枚のPNGスプライトシートに書き出し</div>
+            <div class="export-options">
+              <div class="export-option">
+                <label>列数:
+                  <input type="number" id="sheetCols" value="8" min="1" max="32" style="width:50px">
+                </label>
+              </div>
+              <div class="export-option">
+                <label>スケール:
+                  <select id="sheetScale">
+                    <option value="1">1x</option>
+                    <option value="2" selected>2x</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <button class="btn primary" onclick="exportSpritesheet()">スプライトシート書き出し</button>
+          </div>
         </div>
-        <div>
-          <div class="small muted" style="margin-bottom:8px;">OLE/CFB ストリーム一覧</div>
-          <div class="list" id="streamsList"></div>
+
+        <div class="export-section-header">一括書き出し（全アニメーション）</div>
+        <div class="export-grid">
+          <div class="export-card">
+            <div class="export-card-icon">📦</div>
+            <div class="export-card-title">全GIF + 音声 ZIP</div>
+            <div class="export-card-desc">全アニメーションをGIF、全音声をWAVとしてひとつのZIPに書き出し</div>
+            <div class="export-options">
+              <div class="export-option">
+                <label>GIFスケール:
+                  <select id="allGifScale">
+                    <option value="1">1x</option>
+                    <option value="2" selected>2x</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <button class="btn primary" onclick="exportAllZIP()">全データ ZIP 書き出し</button>
+          </div>
+
+          <div class="export-card">
+            <div class="export-card-icon">🖼</div>
+            <div class="export-card-title">全フレーム PNG ZIP</div>
+            <div class="export-card-desc">全アニメーションの全フレームをPNGとしてZIPに書き出し</div>
+            <div class="export-options">
+              <div class="export-option">
+                <label>スケール:
+                  <select id="allPngScale">
+                    <option value="1">1x</option>
+                    <option value="2" selected>2x</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <button class="btn primary" onclick="exportAllPNGs()">全PNG ZIP 書き出し</button>
+          </div>
         </div>
       </div>
     </div>
-  </section>
-</main>
 
-  </div>  <script type="module">
-    const { default: JSZip } = await import('https://esm.sh/jszip@3.10.1');
-    const CFBModule = await import('https://esm.sh/cfb@1.2.3');
-    const GifEnc = await import('https://esm.sh/gifenc@1.0.3');
+    <!-- Audio Tab -->
+    <div class="tab-content" id="tab-audio">
+      <div id="audioEmpty" class="empty-state">
+        <div class="empty-icon">♪</div>
+        <div class="empty-title">音声データ</div>
+        <div class="empty-desc">ACSファイルを読み込むと音声一覧が表示されます</div>
+      </div>
+      <div class="audio-list" id="audioList" style="display:none"></div>
+    </div>
 
-    const CFB = CFBModule.default ?? CFBModule;
-    const { GIFEncoder, quantize, applyPalette } = GifEnc;
+    <!-- Images Tab -->
+    <div class="tab-content" id="tab-images">
+      <div id="imagesEmpty" class="empty-state">
+        <div class="empty-icon">🖼</div>
+        <div class="empty-title">フレーム画像</div>
+        <div class="empty-desc">ACSファイルを読み込むと全フレーム画像が表示されます</div>
+      </div>
+      <div id="imagesGrid" style="display:none; flex:1; overflow-y:auto; padding:12px; display:none">
+        <div id="imagesGridInner" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(80px,1fr)); gap:6px;"></div>
+      </div>
+    </div>
+  </main>
+</div>
 
-    const $ = (id) => document.getElementById(id);
-    const logEl = $('log');
-    const canvas = $('previewCanvas');
-    const ctx = canvas.getContext('2d');
-    const offCanvas = document.createElement('canvas');
-    const offCtx = offCanvas.getContext('2d');
+<!-- Progress overlay -->
+<div class="progress-overlay" id="progressOverlay">
+  <div class="progress-title" id="progressTitle">処理中...</div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-fill" id="progressFill"></div>
+  </div>
+  <div class="progress-msg" id="progressMsg"></div>
+</div>
 
-    const state = {
-      file: null,
-      fileName: '',
-      bytes: null,
-      parsed: null,
-      resources: [],
-      selectedAnimationIndex: 0,
-      currentFrameIndex: 0,
-      playing: false,
-      timer: null,
-      tabs: new Set(['previewTab']),
-      objectUrls: new Set(),
-      streamEntries: [],
-      isCFB: false,
-      initialized: false,
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- JSZip -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<!-- gif.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// ACS PARSER — kairu-py (How2HideYou) の移植
+// buffer.py / structs.py / _image_decompression.py / _sound.py
+// ═══════════════════════════════════════════════════════════════
+
+// ── Buffer (buffer.py の移植) ──────────────────────────────────
+class Buffer {
+  constructor(bytes, root, absOffset, pos = 0) {
+    // bytes: Uint8Array (view)
+    // root: Uint8Array (全体)
+    this.bytes = bytes;
+    this.root = root;
+    this.absOffset = absOffset;
+    this.pos = pos;
+    this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  }
+
+  get length() { return this.bytes.length; }
+
+  ensure(length, label = 'read') {
+    if (length < 0 || this.pos + length > this.length) {
+      throw new Error(`${label} out of range at 0x${(this.absOffset + this.pos).toString(16)} (${length} bytes)`);
+    }
+  }
+
+  clone() {
+    return new Buffer(this.bytes, this.root, this.absOffset, this.pos);
+  }
+
+  slice(start, end) {
+    const s = this.bytes.subarray(start, end);
+    return new Buffer(s, this.root, this.absOffset + start);
+  }
+
+  read() {
+    this.ensure(1, 'byte');
+    return this.bytes[this.pos++];
+  }
+
+  readBytes(length) {
+    this.ensure(length, 'bytes');
+    const out = this.bytes.subarray(this.pos, this.pos + length);
+    this.pos += length;
+    return out;
+  }
+
+  readInteger(length, signed = false) {
+    this.ensure(length, 'integer');
+    let v = 0;
+    for (let i = 0; i < length; i++) v += this.bytes[this.pos++] * (2 ** (8 * i));
+    if (signed && length === 2 && v >= 0x8000) v -= 0x10000;
+    if (signed && length === 4 && v >= 0x80000000) v -= 0x100000000;
+    return v;
+  }
+
+  readUshort() { return this.readInteger(2); }
+  readUlong()  { return this.readInteger(4); }
+
+  readString() {
+    this.ensure(4, 'string length');
+    const len = this.readUlong();
+    const byteLength = len * 2 + (len > 0 ? 2 : 0);
+    if (!Number.isFinite(len) || len > 0x4000 || this.pos + byteLength > this.length) {
+      throw new Error(`invalid string length ${len} at 0x${(this.absOffset + this.pos - 4).toString(16)}`);
+    }
+    let s = '';
+    for (let i = 0; i < len; i++) s += String.fromCharCode(this.readUshort());
+    if (len > 0) this.skip(2); // null terminator
+    return s;
+  }
+
+  // ACSLOCATOR: (ULONG offset, ULONG size) → その範囲の Buffer
+  locator() {
+    const address = this.readUlong();
+    const size    = this.readUlong();
+    if (address < 0 || size < 0 || address + size > this.root.length) {
+      throw new Error(`invalid locator 0x${address.toString(16)} + ${size}`);
+    }
+    const sub = this.root.subarray(address, address + size);
+    return new Buffer(sub, this.root, address);
+  }
+
+  // locator だが size を無視して address から末尾まで
+  locatorUnsized() {
+    const address = this.readUlong();
+    this.readUlong(); // size (unused)
+    if (address < 0 || address > this.root.length) {
+      throw new Error(`invalid locator 0x${address.toString(16)}`);
+    }
+    const sub = this.root.subarray(address);
+    return new Buffer(sub, this.root, address);
+  }
+
+  skip(n) {
+    this.ensure(n, 'skip');
+    this.pos += n;
+  }
+  seek(pos) {
+    if (pos < 0 || pos > this.length) throw new Error(`seek out of range: ${pos}`);
+    this.pos = pos;
+  }
+
+  // count_type: 'byte'|'ushort'|'ulong'
+  readList(elemReader, countType = 'ushort') {
+    let length;
+    if (countType === 'byte')   length = this.read();
+    else if (countType === 'ushort') length = this.readUshort();
+    else length = this.readUlong();
+    if (!Number.isFinite(length) || length > 100000) {
+      throw new Error(`invalid list length ${length} at 0x${(this.absOffset + this.pos).toString(16)}`);
+    }
+    const out = [];
+    for (let i = 0; i < length; i++) out.push(elemReader(this));
+    return out;
+  }
+}
+
+function makeBuffer(arrayBuffer) {
+  const root = new Uint8Array(arrayBuffer);
+  return new Buffer(root, root, 0);
+}
+
+// ── Decompression (_image_decompression.py の移植) ──────────────
+function reverseBits(b) {
+  b = ((b >> 4) & 0x0F) | ((b << 4) & 0xF0);
+  b = ((b >> 2) & 0x33) | ((b << 2) & 0xCC);
+  b = ((b >> 1) & 0x55) | ((b << 1) & 0xAA);
+  return b & 0xFF;
+}
+
+class BitReader {
+  constructor(data) {
+    // data: Uint8Array — まず各バイトをビット反転
+    this.data = new Uint8Array(data.length);
+    for (let i = 0; i < data.length; i++) this.data[i] = reverseBits(data[i]);
+    this.bitPos = 0;
+  }
+
+  get totalBits() { return this.data.length * 8; }
+
+  readBit() {
+    const byteIdx = this.bitPos >> 3;
+    const bitIdx  = 7 - (this.bitPos & 7);
+    this.bitPos++;
+    return (this.data[byteIdx] >> bitIdx) & 1;
+  }
+
+  // n ビット読み込み (LSB first = read_rev)
+  readRev(n) {
+    let v = 0;
+    for (let i = 0; i < n; i++) v |= (this.readBit() << i);
+    return v;
+  }
+
+  readBool() { return this.readBit() !== 0; }
+
+  // limit個まで連続する1ビットを数える
+  countConsecutiveOnes(limit) {
+    let count = 0;
+    for (let i = 0; i < limit; i++) {
+      if (this.readBool()) count++;
+      else break;
+    }
+    return count;
+  }
+}
+
+const VALUE_BIT_COUNT = [6, 9, 12, 20];
+const OFFSET_TO_ADD   = [1, 65, 577, 4673];
+const USE_RETURN_ANIMATION = 0;
+const USE_EXIT_BRANCHES = 1;
+const NO_TRANSITION = 2;
+const MAX_PATTERN_COUNT = 24;
+const MAX_PATTERN_FRAMES = 360;
+const MAX_PATTERN_DURATION_MS = 30000;
+const PATTERN_GAP_MS = 250;
+const MAX_FRAME_STRIP_ITEMS = 1200;
+const SAEKO_GUID = '9efb1287-f4f1-d111-86fe-0000f8759339';
+const GIF_WORKER_SCRIPT = 'https://cdnjs.cloudflare.com/ajax/libs/gif.js/0.2.0/gif.worker.js';
+    const WEBM_MUXER_MODULE = 'https://cdn.jsdelivr.net/npm/webm-muxer@5.0.3/+esm';
+const MS_ADPCM_ADAPTATION_TABLE = [230, 230, 230, 230, 307, 409, 512, 614, 768, 614, 512, 409, 307, 230, 230, 230];
+const LOCALES = {
+  0x401: 'ar_SA', 0x404: 'zh_TW', 0x405: 'cs_CZ', 0x406: 'da_DK',
+  0x407: 'de_DE', 0x408: 'el_GR', 0x009: 'en_US', 0x40b: 'fi_FI',
+  0x40c: 'fr_FR', 0x40d: 'he_IL', 0x40e: 'hu_HU', 0x410: 'it_IT',
+  0x411: 'ja_JP', 0x412: 'ko_KR', 0x413: 'nl_NL', 0x414: 'nb_NO',
+  0x415: 'pl_PL', 0x416: 'pt_BR', 0x418: 'ro_RO', 0x419: 'ru_RU',
+  0x41a: 'hr_HR', 0x41b: 'sk_SK', 0x41d: 'sv_SE', 0x41e: 'th_TH',
+  0x41f: 'tr_TR', 0x424: 'sl_SI', 0x42d: 'eu_ES', 0x804: 'zh_CN',
+  0x816: 'pt_PT', 0xc0a: 'es_ES',
+};
+
+const UI_LANG = /^ja\b/i.test(navigator.language || '') ? 'ja' : 'en';
+const UI_TEXT = {
+  ja: {
+    'status.ready': 'ファイルを読み込んでください',
+    'status.loading': '読み込み中...',
+    'status.error': 'エラー',
+    'status.loaded': '{name} — {animations}アニメ / {images}画像 / {audio}音声',
+    'progress.gif': 'GIF 生成中...',
+    'progress.video': '動画生成中...',
+    'progress.png': 'PNG 生成中...',
+    'progress.encoding': 'エンコード中...',
+    'progress.frameOf': 'フレーム {current}/{total}',
+    'toast.exportDone': '{filename} 書き出し完了',
+    'error.selectAnimation': 'アニメーションを選択してください',
+    'error.exportFailed': '書き出しエラー: {message}',
+    'error.gifTimeout': 'GIF エンコードがタイムアウトしました。倍率を下げるか WebM 書き出しを試してください。',
+    'error.videoUnsupported': 'このブラウザでは選択した動画形式を利用できません',
+    'error.audioDecode': '一部の音声をブラウザでデコードできませんでした',
+  },
+  en: {
+    'status.ready': 'Load a file',
+    'status.loading': 'Loading...',
+    'status.error': 'Error',
+    'status.loaded': '{name} — {animations} animations / {images} images / {audio} sounds',
+    'progress.gif': 'Generating GIF...',
+    'progress.video': 'Generating video...',
+    'progress.png': 'Generating PNG...',
+    'progress.encoding': 'Encoding...',
+    'progress.frameOf': 'Frame {current}/{total}',
+    'toast.exportDone': '{filename} exported',
+    'error.selectAnimation': 'Select an animation first',
+    'error.exportFailed': 'Export failed: {message}',
+    'error.gifTimeout': 'GIF encoding timed out. Try a lower scale or export WebM instead.',
+    'error.videoUnsupported': 'The selected video format is not supported by this browser',
+    'error.audioDecode': 'Some audio clips could not be decoded by this browser',
+  },
+};
+
+const EN_TEXT = new Map(Object.entries({
+  'ファイルを読み込んでください': 'Load a file',
+  'ACS / ACG ファイル': 'ACS / ACG file',
+  'クリックまたはドロップ': 'Click or drop',
+  '.acs / .acg ファイルを選択': 'Choose an .acs / .acg file',
+  'アニメーションを検索...': 'Search animations...',
+  'ファイルを読み込むとアニメーション一覧が表示されます': 'Load a file to show animations',
+  '▶ プレビュー': '▶ Preview',
+  'ⓘ 概要': 'ⓘ Overview',
+  '⬇ エクスポート': '⬇ Export',
+  '♪ 音声': '♪ Audio',
+  '🖼 フレーム画像': '🖼 Frame images',
+  'アニメーションを選択': 'Select an animation',
+  '左のリストからアニメーションをクリックして再生します': 'Click an animation in the list to preview it',
+  '▶ 再生': '▶ Play',
+  '■ 停止': '■ Stop',
+  '表示': 'View',
+  '速度': 'Speed',
+  'フレーム': 'Frames',
+  '音声なし': 'No audio',
+  'ファイル概要': 'File overview',
+  'ACSファイルを読み込むとロケール別情報や状態一覧が表示されます': 'Load an ACS file to show locale data and states',
+  'アニメーション書き出し（選択中）': 'Selected animation exports',
+  'GIF アニメーション': 'GIF animation',
+  '選択中のアニメーションをアニメーションGIFで書き出し': 'Export the selected animation as a GIF',
+  'GIF 書き出し': 'Export GIF',
+  'PNG シーケンス': 'PNG sequence',
+  'フレームを個別のPNG画像としてZIPで書き出し': 'Export frames as PNG files in a ZIP',
+  'PNG ZIP 書き出し': 'Export PNG ZIP',
+  'WebP アニメーション': 'WebP animation',
+  '選択中のアニメーションをWebPで書き出し（Canvas API経由）': 'Export selected frames as WebP images',
+  'WebP ZIP 書き出し': 'Export WebP ZIP',
+  '動画 + 音声': 'Video + audio',
+  '選択中のアニメーションを音声付きWebM/MP4で書き出し': 'Export the selected animation as WebM/MP4 with audio',
+  '動画 書き出し': 'Export video',
+  'スプライトシート': 'Spritesheet',
+  '全フレームを1枚のPNGスプライトシートに書き出し': 'Export all frames into one PNG spritesheet',
+  'スプライトシート書き出し': 'Export spritesheet',
+  '一括書き出し（全アニメーション）': 'Bulk export',
+  '全GIF + 音声 ZIP': 'All GIFs + audio ZIP',
+  '全アニメーションをGIF、全音声をWAVとしてひとつのZIPに書き出し': 'Export every animation as GIF and all sounds as WAV in one ZIP',
+  '全データ ZIP 書き出し': 'Export all data ZIP',
+  '全フレーム PNG ZIP': 'All frames PNG ZIP',
+  '全アニメーションの全フレームをPNGとしてZIPに書き出し': 'Export every animation frame as PNG in a ZIP',
+  '全PNG ZIP 書き出し': 'Export all PNG ZIP',
+  '音声データ': 'Audio data',
+  'ACSファイルを読み込むと音声一覧が表示されます': 'Load an ACS file to show audio clips',
+  'フレーム画像': 'Frame images',
+  'ACSファイルを読み込むと全フレーム画像が表示されます': 'Load an ACS file to show all frame images',
+  'スケール:': 'Scale:',
+  'ループ:': 'Loop:',
+  '無限ループ': 'Loop forever',
+  '1回': 'Once',
+  '3回': '3 times',
+  '透明背景': 'Transparent background',
+  '品質:': 'Quality:',
+  '列数:': 'Columns:',
+  'GIFスケール:': 'GIF scale:',
+  '形式:': 'Format:',
+  '名前': 'Name',
+  'ロケール': 'Locale',
+  'サイズ': 'Size',
+  'パレット': 'Palette',
+  'アニメ数': 'Animations',
+  '音声数': 'Sounds',
+  'ファイル': 'File',
+  '表示名': 'Display name',
+  '選択ロケール': 'Selected locale',
+  'データ': 'Data',
+  'キャラクターサイズ': 'Character size',
+  '透明色Index': 'Transparent index',
+  'アニメーション': 'Animations',
+  'フレーム画像': 'Frame images',
+  '音声': 'Audio',
+  '状態': 'States',
+  'パターン': 'Patterns',
+  '複数パターン': 'Multi-pattern animations',
+  '分岐とパターン': 'Branches and patterns',
+  '分岐なし': 'No branches',
+  '解析対応状況': 'Parser coverage',
+  '総フレーム': 'Frames',
+  '画像参照': 'Image refs',
+  '分岐': 'Branches',
+  '口パクOverlay': 'Mouth overlays',
+  'ロケール別情報': 'Localized info',
+  'ロケール情報なし': 'No locale data',
+  '状態とアニメーション': 'States and animations',
+  '状態情報なし': 'No state data',
+}));
+
+function t(key, values = {}) {
+  let text = (UI_TEXT[UI_LANG] && UI_TEXT[UI_LANG][key]) || UI_TEXT.ja[key] || key;
+  for (const [name, value] of Object.entries(values)) {
+    text = text.replaceAll(`{${name}}`, value);
+  }
+  return text;
+}
+
+function localizeTextValue(text) {
+  if (UI_LANG !== 'en') return text;
+  if (EN_TEXT.has(text)) return EN_TEXT.get(text);
+  const exported = String(text).match(/^(.*) 書き出し完了$/);
+  if (exported) return `${exported[1]} exported`;
+  return text;
+}
+
+function applyUILocale(root = document.body) {
+  document.documentElement.lang = UI_LANG === 'ja' ? 'ja' : 'en';
+  if (UI_LANG !== 'en') return;
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    const trimmed = node.nodeValue.trim();
+    if (!trimmed) continue;
+    const translated = EN_TEXT.get(trimmed);
+    if (translated) node.nodeValue = node.nodeValue.replace(trimmed, translated);
+  }
+
+  document.querySelectorAll('input[placeholder]').forEach(input => {
+    input.placeholder = localizeTextValue(input.placeholder);
+  });
+}
+
+function decompress(data, bufferSize) {
+  const stream = new BitReader(data);
+  const out = new Uint8Array(bufferSize);
+  let outPos = 0;
+  let totalDecoded = 0;
+
+  stream.readRev(8); // 最初の8ビットをスキップ
+
+  while (stream.bitPos < stream.totalBits) {
+    if (!stream.readBool()) {
+      // 非圧縮の1バイト
+      const byte = stream.readRev(8);
+      out[outPos++] = byte;
+      totalDecoded++;
+    } else {
+      // バック参照
+      let bytesToDecode = 2;
+
+      const seqBits1 = stream.countConsecutiveOnes(3);
+      const valBitCount = VALUE_BIT_COUNT[seqBits1];
+      let offset = stream.readRev(valBitCount);
+
+      if (valBitCount === 20) {
+        if (offset === 0x000FFFFF) break; // end of stream
+        bytesToDecode++;
+      }
+
+      offset += OFFSET_TO_ADD[seqBits1];
+
+      const seqBits2 = stream.countConsecutiveOnes(12);
+      if (seqBits2 === 12) throw new Error('decompression: seqBits2 == 12');
+
+      const add1 = (1 << seqBits2) - 1;
+      const add2 = stream.readRev(seqBits2);
+      bytesToDecode += add1 + add2;
+
+      // コピー
+      const srcIdx = totalDecoded - offset;
+      for (let i = 0; i < bytesToDecode; i++) {
+        out[outPos + i] = out[srcIdx + i];
+      }
+      outPos += bytesToDecode;
+      totalDecoded += bytesToDecode;
+    }
+  }
+  return out.subarray(0, totalDecoded);
+}
+
+function decompressPalettedImage(data, w, h, compressed, extraWidth = 0) {
+  w += extraWidth;
+  let raw;
+  const stride = (w + 3) & 0xFC;
+  if (compressed) {
+    raw = decompress(data, stride * h);
+  } else {
+    raw = data;
+  }
+
+  const out = new Uint8Array(w * h);
+  const rowStride = raw.length >= stride * h ? stride : w;
+  for (let row = 0; row < h; row++) {
+    const srcRow = h - 1 - row;
+    const srcStart = srcRow * rowStride;
+    const src = raw.subarray(srcStart, srcStart + w);
+    out.set(src, row * w);
+  }
+  return out; // w*h, palette indices
+}
+
+// ── Structs (structs.py の移植) ───────────────────────────────
+
+function readLocalizedInfo(buf) {
+  const langId = buf.readUshort();
+  return {
+    langId,
+    locale: LOCALES[langId] || `0x${langId.toString(16)}`,
+    name:   buf.readString(),
+    desc:   buf.readString(),
+    extra:  buf.readString(),
+  };
+}
+
+function parseCharacterInfo(buf) {
+  buf.readUshort(); // minor version
+  buf.readUshort(); // major version
+
+  // localized info は locator() 経由で別の場所にある
+  const localizedBuf = buf.locator();
+  const localizedInfos = localizedBuf.readList(readLocalizedInfo, 'ushort');
+  const localizedInfoByLocale = Object.fromEntries(localizedInfos.map(info => [info.locale, info]));
+
+  const guid = formatGuid(buf.readBytes(16));
+  const width  = buf.readUshort();
+  const height = buf.readUshort();
+  const transparencyIndex = buf.read();
+
+  const flags = buf.readUlong();
+  const animationSetMajor = buf.readUshort();
+  const animationSetMinor = buf.readUshort();
+  const optionalInfoStart = buf.pos;
+  const optionalInfo = parseCharacterOptionalInfo(buf, optionalInfoStart, flags);
+  const voiceInfo = optionalInfo.voiceInfo;
+  const balloonInfo = optionalInfo.balloonInfo;
+  buf.seek(optionalInfo.pos);
+
+  // Palette
+  const paletteSize = buf.readUlong();
+  if (!Number.isFinite(paletteSize) || paletteSize < 0 || paletteSize > 256 || buf.pos + paletteSize * 4 > buf.length) {
+    throw new Error(`invalid palette size ${paletteSize}`);
+  }
+  const palRaw = buf.readBytes(paletteSize * 4); // BGRA per entry
+  // palette[i] = [R, G, B, A]
+  const palette = [];
+  for (let i = 0; i < paletteSize; i++) {
+    const b = palRaw[i * 4 + 0];
+    const g = palRaw[i * 4 + 1];
+    const r = palRaw[i * 4 + 2];
+    palette.push([r, g, b, 255]);
+  }
+  if (palette.length === 0) {
+    palette.push([0, 0, 0, 0]);
+  }
+  // 透明色のアルファを0に
+  if (palette[transparencyIndex]) palette[transparencyIndex][3] = 0;
+
+  // TrayIcon
+  const trayIconPresent = buf.read() === 1;
+  if (trayIconPresent) {
+    // skip mono + color icon data
+    const monoSize = buf.readUlong(); buf.skip(monoSize);
+    const colorSize = buf.readUlong(); buf.skip(colorSize);
+  }
+
+  // State infos
+  const stateInfos = {};
+  const stateCount = buf.readUshort();
+  for (let i = 0; i < stateCount; i++) {
+    const stateName = buf.readString();
+    const animNames = buf.readList(b => b.readString(), 'ushort');
+    stateInfos[stateName] = animNames;
+  }
+
+  return {
+    guid,
+    width,
+    height,
+    transparencyIndex,
+    flags,
+    animationSetMajor,
+    animationSetMinor,
+    voiceInfo,
+    balloonInfo,
+    palette,
+    localizedInfos,
+    localizedInfoByLocale,
+    stateInfos,
+    trayIconPresent,
+  };
+}
+
+function formatGuid(bytes) {
+  const hex = [...bytes].map(b => b.toString(16).padStart(2, '0'));
+  return [
+    hex.slice(0, 4).join(''),
+    hex.slice(4, 6).join(''),
+    hex.slice(6, 8).join(''),
+    hex.slice(8, 10).join(''),
+    hex.slice(10, 16).join(''),
+  ].join('-');
+}
+
+function readVoiceInfo(buf) {
+  const engineId = formatGuid(buf.readBytes(16));
+  const modeId = formatGuid(buf.readBytes(16));
+  const speed = buf.readUlong();
+  const pitch = buf.readUshort();
+  const hasExtraFlag = buf.read();
+  if (hasExtraFlag !== 0 && hasExtraFlag !== 1) {
+    throw new Error(`invalid voice info extra flag ${hasExtraFlag}`);
+  }
+  const info = {
+    engineId,
+    modeId,
+    speed,
+    pitch,
+    hasExtraData: hasExtraFlag !== 0,
+    extra: null,
+  };
+  if (info.hasExtraData) {
+    info.extra = {
+      langId: buf.readUshort(),
+      dialect: buf.readString(),
+      gender: buf.readUshort(),
+      age: buf.readUshort(),
+      style: buf.readString(),
     };
+  }
+  return info;
+}
 
-    const ui = {
-      statusText: $('statusText'),
-      fileName: $('fileName'),
-      formatText: $('formatText'),
-      sizeText: $('sizeText'),
-      charSummary: $('charSummary'),
-      localizedSummary: $('localizedSummary'),
-      frameInfo: $('frameInfo'),
-      notesSummary: $('notesSummary'),
-      jsonDump: $('jsonDump'),
-      imagesGrid: $('imagesGrid'),
-      soundsGrid: $('soundsGrid'),
-      animationsList: $('animationsList'),
-      streamsList: $('streamsList'),
-      animSelect: $('animSelect'),
-      animSearch: $('animSearch'),
-      exportGifBtn: $('exportGifBtn'),
-      exportZipBtn: $('exportZipBtn'),
-      downloadAllImagesBtn: $('downloadAllImagesBtn'),
-      downloadAllSoundsBtn: $('downloadAllSoundsBtn'),
-      downloadAnimJsonBtn: $('downloadAnimJsonBtn'),
-      playBtn: $('playBtn'),
-      stopBtn: $('stopBtn'),
-      stepBtn: $('stepBtn'),
-      randomBtn: $('randomBtn'),
-      playbackHint: $('playbackHint'),
-      allGifsCheck: $('allGifsCheck'),
-      includeRawCheck: $('includeRawCheck'),
+function readBalloonInfo(buf) {
+  const lines = buf.read();
+  const charsPerLine = buf.read();
+  if (lines > 64 || charsPerLine > 255) {
+    throw new Error(`invalid balloon dimensions ${lines}/${charsPerLine}`);
+  }
+  const info = {
+    lines,
+    charsPerLine,
+    foreground: [...buf.readBytes(4)],
+    background: [...buf.readBytes(4)],
+    border: [...buf.readBytes(4)],
+    fontName: buf.readString(),
+    fontHeight: buf.readInteger(4, true),
+    fontWeight: buf.readInteger(4, true),
+    italic: buf.read() !== 0,
+    unknown: buf.read(),
+  };
+  return info;
+}
+
+function readUlongAt(buf, pos) {
+  if (pos < 0 || pos + 4 > buf.length) return NaN;
+  return (
+    buf.bytes[pos] |
+    (buf.bytes[pos + 1] << 8) |
+    (buf.bytes[pos + 2] << 16) |
+    (buf.bytes[pos + 3] * 0x1000000)
+  ) >>> 0;
+}
+
+function isValidPaletteAt(buf, pos) {
+  const paletteSize = readUlongAt(buf, pos);
+  return Number.isFinite(paletteSize) &&
+    paletteSize >= 0 &&
+    paletteSize <= 256 &&
+    pos + 4 + paletteSize * 4 <= buf.length;
+}
+
+function parseCharacterOptionalInfo(buf, optionalInfoStart, flags) {
+  const wantsVoice = (flags & (1 << 4)) !== 0 || (flags & (1 << 5)) !== 0;
+  const wantsBalloon = (flags & ((1 << 8) | (1 << 9))) !== 0;
+  const specs = [];
+  const seen = new Set();
+  const add = (voice, balloon) => {
+    const key = `${voice}:${balloon}`;
+    if (!seen.has(key)) {
+      specs.push({ voice, balloon });
+      seen.add(key);
+    }
+  };
+
+  add(wantsVoice, wantsBalloon);
+  if (wantsBalloon) add(false, true);
+  if (wantsVoice) add(true, false);
+  add(false, false);
+  add(true, true);
+  add(true, false);
+  add(false, true);
+
+  for (const spec of specs) {
+    const probe = buf.clone();
+    probe.seek(optionalInfoStart);
+    try {
+      const voiceInfo = spec.voice ? readVoiceInfo(probe) : null;
+      const balloonInfo = spec.balloon ? readBalloonInfo(probe) : null;
+      if (isValidPaletteAt(probe, probe.pos)) {
+        return { pos: probe.pos, voiceInfo, balloonInfo };
+      }
+    } catch (err) {
+      // Try the next observed layout. Some ACS files disagree with the flag bits.
+    }
+  }
+
+  throw new Error('ACS character optional data could not be aligned before the palette');
+}
+
+function readFrameImage(buf) {
+  return {
+    imageIdx: buf.readUlong(),
+    x: buf.readInteger(2, true),
+    y: buf.readInteger(2, true),
+  };
+}
+
+function readBranchInfo(buf) {
+  return { jumpTarget: buf.readUshort(), prob: buf.readUshort() };
+}
+
+function readOverlayInfo(buf) {
+  const overlay = {
+    type: buf.read(),
+    replaceTop: buf.read() !== 0,
+    imageIdx: buf.readUshort(),
+    unknown: buf.read(),
+    hasRegion: buf.read() !== 0,
+    x: buf.readInteger(2, true),
+    y: buf.readInteger(2, true),
+    w: buf.readUshort(),
+    h: buf.readUshort(),
+    regionLength: 0,
+  };
+  if (overlay.hasRegion) {
+    overlay.regionLength = buf.readUlong();
+    buf.skip(overlay.regionLength);
+  }
+  return overlay;
+}
+
+function readFrameInfo(buf) {
+  const frameImages = buf.readList(readFrameImage, 'ushort');
+  const audioIdx    = buf.readUshort();
+  const durationCs  = buf.readUshort(); // centiseconds
+  const exitIndex   = buf.readInteger(2, true);
+  const branches    = buf.readList(readBranchInfo, 'byte');
+  const overlays = buf.readList(readOverlayInfo, 'byte');
+
+  return { frameImages, audioIdx, durationCs, exitIndex, branches, overlays };
+}
+
+function readAnimInfo(buf) {
+  const name = buf.readString();
+  // Animation data は locator() 経由
+  const animBuf = buf.locator();
+  const animName        = animBuf.readString();
+  const transitionType  = animBuf.read();
+  const returnAnimName  = animBuf.readString();
+  const frames = animBuf.readList(readFrameInfo, 'ushort');
+  return { name: animName || name, transitionType, returnAnimName, frames };
+}
+
+// ── Image reader (_image_decompression.py: read_image) ─────────
+
+function readImage(imageBuf, palette, transparencyIndex, extraWidth = 0) {
+  // imageBuf は locator() で切り出した範囲
+  imageBuf.skip(1);              // unknown byte
+  const w = imageBuf.readUshort();
+  const h = imageBuf.readUshort();
+  const compressed = imageBuf.read() !== 0;
+  const compLength = imageBuf.readUlong();
+  const rawData = imageBuf.readBytes(compLength);
+
+  const indexed = decompressPalettedImage(rawData, w, h, compressed, extraWidth);
+  const outW = w + extraWidth;
+  let regionInfo = null;
+  if (imageBuf.pos + 8 <= imageBuf.length) {
+    const compressedSize = imageBuf.readUlong();
+    const uncompressedSize = imageBuf.readUlong();
+    const regionLength = compressedSize || uncompressedSize;
+    if (regionLength >= 0 && imageBuf.pos + regionLength <= imageBuf.length) {
+      imageBuf.skip(regionLength);
+      regionInfo = { compressedSize, uncompressedSize };
+    }
+  }
+
+  // インデックス → RGBA
+  const rgba = new Uint8ClampedArray(outW * h * 4);
+  for (let i = 0; i < indexed.length; i++) {
+    const pidx = indexed[i];
+    const col = palette[pidx] || [0, 0, 0, 255];
+    rgba[i * 4]     = col[0];
+    rgba[i * 4 + 1] = col[1];
+    rgba[i * 4 + 2] = col[2];
+    rgba[i * 4 + 3] = (pidx === transparencyIndex) ? 0 : 255;
+  }
+
+  return { w: outW, h, rgba, regionInfo };
+}
+
+// ── Audio reader (_sound.py の移植) ────────────────────────────
+
+function readAudioClips(audioBuf) {
+  // ULONG count, then each: locator (offset+size) + ULONG checksum
+  const count = audioBuf.readUlong();
+  const clips = [];
+  for (let i = 0; i < count; i++) {
+    const address = audioBuf.readUlong();
+    const size    = audioBuf.readUlong();
+    audioBuf.readUlong(); // checksum
+    // wav データは locator の範囲の末尾4バイト(checksum)を除いたもの
+    const wavData = audioBuf.root.subarray(address, address + size - 4);
+    clips.push(wavData);
+  }
+  return clips;
+}
+
+function analyzeACS(charInfo, animations, imageLocators, audioClips) {
+  const frames = animations.flatMap(anim => anim.frames);
+  return {
+    frameCount: frames.length,
+    frameImageRefs: frames.reduce((sum, frame) => sum + frame.frameImages.length, 0),
+    branchCount: frames.reduce((sum, frame) => sum + frame.branches.length, 0),
+    overlayCount: frames.reduce((sum, frame) => sum + frame.overlays.length, 0),
+    overlayRegionCount: frames.reduce((sum, frame) => sum + frame.overlays.filter(overlay => overlay.hasRegion).length, 0),
+    transitionTypes: [...new Set(animations.map(anim => anim.transitionType))],
+    hasVoiceInfo: !!charInfo.voiceInfo,
+    hasBalloonInfo: !!charInfo.balloonInfo,
+    hasTrayIcon: !!charInfo.trayIconPresent,
+    localeCount: charInfo.localizedInfos.length,
+    imageCount: imageLocators.length,
+    audioCount: audioClips.length,
+  };
+}
+
+function readAudioInfo(bytes, checksum = 0) {
+  try {
+    const wav = parseWav(bytes);
+    return {
+      checksum,
+      codecTag: wav.fmt.tag,
+      codec: wav.fmt.tag === 1 ? 'PCM' : wav.fmt.tag === 2 ? 'Microsoft ADPCM' : `0x${wav.fmt.tag.toString(16)}`,
+      channels: wav.fmt.channels,
+      sampleRate: wav.fmt.sampleRate,
+      bitsPerSample: wav.fmt.bitsPerSample,
+      dataSize: wav.data.size,
+      availableDataSize: Math.max(0, Math.min(wav.data.size, bytes.length - wav.data.offset)),
+      browserNativeDecodeLikely: wav.fmt.tag === 1,
     };
+  } catch (err) {
+    return { checksum, codecTag: 0, codec: 'Unknown', error: err.message };
+  }
+}
 
-    function setStatus(text, kind = '') {
-      ui.statusText.textContent = text;
-      ui.statusText.className = 'v' + (kind ? ` ${kind}` : '');
+function readUint16LE(bytes, pos) {
+  if (pos < 0 || pos + 2 > bytes.length) throw new Error(`uint16 out of range at 0x${pos.toString(16)}`);
+  return bytes[pos] | (bytes[pos + 1] << 8);
+}
+
+function readUint32LE(bytes, pos) {
+  if (pos < 0 || pos + 4 > bytes.length) throw new Error(`uint32 out of range at 0x${pos.toString(16)}`);
+  return (
+    bytes[pos] |
+    (bytes[pos + 1] << 8) |
+    (bytes[pos + 2] << 16) |
+    (bytes[pos + 3] * 0x1000000)
+  ) >>> 0;
+}
+
+function readUint64LEAsNumber(bytes, pos) {
+  const lo = readUint32LE(bytes, pos);
+  const hi = readUint32LE(bytes, pos + 4);
+  return hi * 0x100000000 + lo;
+}
+
+function concatUint8Arrays(chunks, maxLength = null) {
+  const length = maxLength ?? chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+  const out = new Uint8Array(length);
+  let pos = 0;
+  for (const chunk of chunks) {
+    if (pos >= length) break;
+    out.set(chunk.subarray(0, Math.min(chunk.length, length - pos)), pos);
+    pos += chunk.length;
+  }
+  return out;
+}
+
+function arrayBufferFromBytes(bytes) {
+  return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+}
+
+function readCompoundFile(bytes) {
+  const CFB_FREE = 0xFFFFFFFF;
+  const CFB_END = 0xFFFFFFFE;
+  const CFB_FAT = 0xFFFFFFFD;
+  const CFB_DIF = 0xFFFFFFFC;
+  const sectorSize = 1 << readUint16LE(bytes, 0x1e);
+  const miniSectorSize = 1 << readUint16LE(bytes, 0x20);
+  const numFatSectors = readUint32LE(bytes, 0x2c);
+  const firstDirectorySector = readUint32LE(bytes, 0x30);
+  const miniStreamCutoff = readUint32LE(bytes, 0x38);
+  const firstMiniFatSector = readUint32LE(bytes, 0x3c);
+  const numMiniFatSectors = readUint32LE(bytes, 0x40);
+  const firstDifatSector = readUint32LE(bytes, 0x44);
+  const numDifatSectors = readUint32LE(bytes, 0x48);
+
+  if (![512, 4096].includes(sectorSize) || miniSectorSize !== 64) {
+    throw new Error('unsupported compound file sector size');
+  }
+
+  const sectorOffset = sector => (sector + 1) * sectorSize;
+  const difat = [];
+  for (let i = 0; i < 109; i++) {
+    const value = readUint32LE(bytes, 0x4c + i * 4);
+    if (value !== CFB_FREE) difat.push(value);
+  }
+
+  let difatSector = firstDifatSector;
+  const difatSeen = new Set();
+  for (let i = 0; i < numDifatSectors && difatSector !== CFB_END && difatSector !== CFB_FREE; i++) {
+    if (difatSeen.has(difatSector)) throw new Error('compound DIFAT loop');
+    difatSeen.add(difatSector);
+    const off = sectorOffset(difatSector);
+    if (off + sectorSize > bytes.length) throw new Error('compound DIFAT sector out of range');
+    for (let j = 0; j < sectorSize / 4 - 1; j++) {
+      const value = readUint32LE(bytes, off + j * 4);
+      if (value !== CFB_FREE) difat.push(value);
+    }
+    difatSector = readUint32LE(bytes, off + sectorSize - 4);
+  }
+
+  const fat = [];
+  for (const fatSector of difat.slice(0, numFatSectors)) {
+    if (fatSector === CFB_FREE || fatSector === CFB_END || fatSector === CFB_FAT || fatSector === CFB_DIF) continue;
+    const off = sectorOffset(fatSector);
+    if (off + sectorSize > bytes.length) throw new Error('compound FAT sector out of range');
+    for (let j = 0; j < sectorSize / 4; j++) {
+      fat.push(readUint32LE(bytes, off + j * 4));
+    }
+  }
+
+  const readRegularChain = (startSector, size = null) => {
+    if (startSector === CFB_END || startSector === CFB_FREE) return new Uint8Array(0);
+    const chunks = [];
+    const seen = new Set();
+    let sector = startSector;
+    let total = 0;
+    const limit = size == null ? Number.MAX_SAFE_INTEGER : size;
+    while (sector !== CFB_END && sector !== CFB_FREE) {
+      if (seen.has(sector)) throw new Error('compound FAT chain loop');
+      if (sector < 0 || sector >= fat.length) throw new Error(`compound sector ${sector} out of FAT range`);
+      const off = sectorOffset(sector);
+      if (off + sectorSize > bytes.length) throw new Error('compound stream sector out of range');
+      const chunk = bytes.subarray(off, off + sectorSize);
+      chunks.push(chunk);
+      total += chunk.length;
+      if (total >= limit) break;
+      seen.add(sector);
+      sector = fat[sector];
+    }
+    const outLength = size == null ? total : Math.min(size, total);
+    return concatUint8Arrays(chunks, outLength);
+  };
+
+  const directoryStream = readRegularChain(firstDirectorySector);
+  const entries = [];
+  for (let pos = 0; pos + 128 <= directoryStream.length; pos += 128) {
+    const nameLength = readUint16LE(directoryStream, pos + 64);
+    const type = directoryStream[pos + 66];
+    if (!nameLength || type === 0) continue;
+    const rawName = directoryStream.subarray(pos, pos + Math.max(0, nameLength - 2));
+    let name = '';
+    for (let i = 0; i + 1 < rawName.length; i += 2) {
+      name += String.fromCharCode(rawName[i] | (rawName[i + 1] << 8));
+    }
+    entries.push({
+      id: pos / 128,
+      name,
+      type,
+      startSector: readUint32LE(directoryStream, pos + 116),
+      size: readUint64LEAsNumber(directoryStream, pos + 120),
+    });
+  }
+
+  const rootEntry = entries.find(entry => entry.type === 5);
+  const miniFatStream = numMiniFatSectors ? readRegularChain(firstMiniFatSector, numMiniFatSectors * sectorSize) : new Uint8Array(0);
+  const miniFat = [];
+  for (let pos = 0; pos + 4 <= miniFatStream.length; pos += 4) {
+    miniFat.push(readUint32LE(miniFatStream, pos));
+  }
+  const miniStream = rootEntry ? readRegularChain(rootEntry.startSector, rootEntry.size) : new Uint8Array(0);
+
+  const readMiniChain = (startMiniSector, size) => {
+    if (startMiniSector === CFB_END || startMiniSector === CFB_FREE) return new Uint8Array(0);
+    const chunks = [];
+    const seen = new Set();
+    let sector = startMiniSector;
+    let total = 0;
+    while (sector !== CFB_END && sector !== CFB_FREE) {
+      if (seen.has(sector)) throw new Error('compound mini FAT chain loop');
+      if (sector < 0 || sector >= miniFat.length) throw new Error(`compound mini sector ${sector} out of range`);
+      const off = sector * miniSectorSize;
+      if (off + miniSectorSize > miniStream.length) throw new Error('compound mini stream sector out of range');
+      const chunk = miniStream.subarray(off, off + miniSectorSize);
+      chunks.push(chunk);
+      total += chunk.length;
+      if (total >= size) break;
+      seen.add(sector);
+      sector = miniFat[sector];
+    }
+    return concatUint8Arrays(chunks, Math.min(size, total));
+  };
+
+  return {
+    entries,
+    readStream(entry) {
+      if (entry.type !== 2) return new Uint8Array(0);
+      return entry.size < miniStreamCutoff
+        ? readMiniChain(entry.startSector, entry.size)
+        : readRegularChain(entry.startSector, entry.size);
+    },
+  };
+}
+
+function parseCompoundCharacterFile(bytes, filename = '') {
+  const compound = readCompoundFile(bytes);
+  const streamEntries = compound.entries.filter(entry => entry.type === 2);
+  for (const entry of streamEntries) {
+    const stream = compound.readStream(entry);
+    if (stream.length >= 4 && readUint32LE(stream, 0) === 0xABCDABC3) {
+      const parsed = parseACS(arrayBufferFromBytes(stream));
+      parsed.containerFormat = 'OLE Compound';
+      parsed.containerStream = entry.name;
+      return parsed;
+    }
+  }
+
+  const names = streamEntries.map(entry => entry.name.toLowerCase());
+  if (names.some(name => name.endsWith('.acf') || name.endsWith('.aaf') || name.endsWith('.aca'))) {
+    throw new Error(`${filename || 'file'} は OLE Compound 内に ACF/AAF ストリームを持つ古い Microsoft Agent 形式です。ACS v2 互換の単一ストリームが無いため、現時点ではプレビュー対象外です。`);
+  }
+
+  throw new Error(`${filename || 'file'} の OLE Compound 内に読み取れる ACS ストリームがありません`);
+}
+
+// ── Main parse ────────────────────────────────────────────────
+
+function parseACS(arrayBuffer) {
+  const buf = makeBuffer(arrayBuffer);
+
+  // Magic: 0xABCDABC3 (LE: C3 AB CD AB)
+// buf が Uint8Array の場合、手動で 4バイトをリトルエンディアン合成する
+const rawMagic = buf.readUlong();
+// >>> 0 を付けることで 0xABCDABC3 という正しい正の数値に変換する
+const magic = rawMagic >>> 0; 
+
+console.log("読み込まれたマジックナンバー:", magic.toString(16).toUpperCase());
+
+if (magic !== 0xABCDABC3) {
+  throw new Error(`無効なマジックナンバー: 0x${magic.toString(16).toUpperCase()}`);
+}
+  // 4 ACSLOCATORs at offset 4, 12, 20, 28
+  // acs_file.py: buf[4:].locator() etc.
+  // → Buffer をスライスして locator() を呼ぶのと同じ
+  const charBuf  = buf.locator(); // offset 4
+  const animBuf  = buf.locator(); // offset 12
+  const imageBuf = buf.locator(); // offset 20
+  const audioBuf = buf.locator(); // offset 28
+
+  console.log('[ACS] size:', arrayBuffer.byteLength,
+    'charOff:', charBuf.absOffset, 'animOff:', animBuf.absOffset,
+    'imgOff:', imageBuf.absOffset, 'audioOff:', audioBuf.absOffset);
+
+  // CharacterInfo
+  const charInfo = parseCharacterInfo(charBuf);
+  console.log('[ACS] CharInfo:', charInfo.width, 'x', charInfo.height,
+    'palette:', charInfo.palette.length, 'transp:', charInfo.transparencyIndex);
+
+  // AnimInfo list (ULONG count)
+  const animations = animBuf.readList(readAnimInfo, 'ulong');
+  console.log('[ACS] Animations:', animations.length);
+
+  // Image list (ULONG count, each: locator + checksum)
+  const imageCount = imageBuf.readUlong();
+  const imageLocators = [];
+  for (let i = 0; i < imageCount; i++) {
+    const address = imageBuf.readUlong();
+    const size    = imageBuf.readUlong();
+    imageBuf.readUlong(); // checksum
+    // imageBuf 自体の root は全体バッファ
+    imageLocators.push({ address, size });
+  }
+  console.log('[ACS] Images:', imageCount);
+
+  // Audio
+  const root = buf.root;
+  audioBuf.pos = 0; // reset to start of audioBuf slice
+  const audioCount = audioBuf.readUlong();
+  const audioClips = [];
+  const audioInfos = [];
+  for (let i = 0; i < audioCount; i++) {
+    const address = audioBuf.readUlong();
+    const size    = audioBuf.readUlong();
+    const checksum = audioBuf.readUlong();
+    // wav = root[address .. address+size-4] (末尾4バイトのchecksumを除く)
+    const wavData = size > 4 ? root.subarray(address, address + size - 4) : new Uint8Array(0);
+    audioClips.push(wavData);
+    audioInfos.push(readAudioInfo(wavData, checksum));
+  }
+  console.log('[ACS] Audio:', audioCount);
+
+  const animByName = Object.fromEntries(animations.map(anim => [anim.name, anim]));
+  const analysis = analyzeACS(charInfo, animations, imageLocators, audioClips);
+  return { format: 'ACS', charInfo, animations, animByName, imageLocators, audioClips, audioInfos, analysis, root };
+}
+
+function parseCharacterFile(arrayBuffer, filename = '') {
+  const root = new Uint8Array(arrayBuffer);
+  const magic = root.length >= 4
+    ? (root[0] + root[1] * 0x100 + root[2] * 0x10000 + root[3] * 0x1000000) >>> 0
+    : 0;
+  const magic2 = root.length >= 8
+    ? (root[4] + root[5] * 0x100 + root[6] * 0x10000 + root[7] * 0x1000000) >>> 0
+    : 0;
+
+  if (magic === 0xABCDABC3) return parseACS(arrayBuffer);
+  if (magic === 0xE011CFD0 && magic2 === 0xE11AB1A1) return parseCompoundCharacterFile(root, filename);
+
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  if (ext === 'acg') {
+    throw new Error('ACG は Microsoft Agent のプレビュー/参照ファイルです。このビューワでは、現時点では同じデータを内包する ACS 形式のみ解析できます。関連する .acs ファイルを読み込んでください。');
+  }
+
+  throw new Error(`無効なマジックナンバー: 0x${magic.toString(16).toUpperCase()}`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IMAGE DECODE (on demand)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Pythonの _reverse_bits(b) と同じ
+ */
+/**
+ * ビット単位で読み込むための簡易クラス
+ */
+function reverseBitsLegacyUnused(b) {
+    b = (b >> 4 & 0x0F) | (b << 4 & 0xF0);
+    b = (b >> 2 & 0x33) | (b << 2 & 0xCC);
+    b = (b >> 1 & 0x55) | (b << 1 & 0xAA);
+    return b;
+}
+
+class BitStreamLegacyUnused {
+    constructor(uint8Array) {
+        // Python版と同様、各バイトをビット反転してから処理
+        this.data = new Uint8Array(uint8Array.length);
+        for (let i = 0; i < uint8Array.length; i++) {
+            this.data[i] = reverseBitsLegacyUnused(uint8Array[i]);
+        }
+        this.pos = 0; // bit position
     }
 
-    function log(...parts) {
-      const line = parts.map(p => typeof p === 'string' ? p : JSON.stringify(p, null, 2)).join(' ');
-      logEl.textContent += line + '\n';
-      logEl.scrollTop = logEl.scrollHeight;
-      console.log(...parts);
+    readBool() {
+        if (this.pos >= this.data.length * 8) return false;
+        const byteIdx = Math.floor(this.pos / 8);
+        const bitIdx = 7 - (this.pos % 8); // 上位ビットから読み込み
+        const val = (this.data[byteIdx] >> bitIdx) & 1;
+        this.pos++;
+        return val === 1;
     }
 
-    function clearLog() { logEl.textContent = ''; }
-
-    function bytesToSize(n) {
-      if (!Number.isFinite(n)) return '-';
-      const units = ['B','KB','MB','GB'];
-      let i = 0, v = n;
-      while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-      return `${v.toFixed(v >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
-    }
-
-    function sanitizeName(name) {
-      return String(name || 'unnamed').replace(/[\\/:*?"<>|\x00-\x1F]/g, '_').replace(/\s+/g, ' ').trim() || 'unnamed';
-    }
-
-    function u8(buf) {
-      return buf instanceof Uint8Array ? buf : new Uint8Array(buf);
-    }
-
-    function concatU8(chunks) {
-      const total = chunks.reduce((a, c) => a + c.length, 0);
-      const out = new Uint8Array(total);
-      let p = 0;
-      for (const c of chunks) { out.set(c, p); p += c.length; }
-      return out;
-    }
-
-    function downloadBlob(blob, filename) {
-      const url = URL.createObjectURL(blob);
-      state.objectUrls.add(url);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.click();
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        state.objectUrls.delete(url);
-      }, 5000);
-    }
-
-    function toDataURLFromBytes(bytes, mime = 'application/octet-stream') {
-      const blob = new Blob([bytes], { type: mime });
-      const url = URL.createObjectURL(blob);
-      state.objectUrls.add(url);
-      return url;
-    }
-
-    function bufferEqualsPrefix(bytes, sig) {
-      if (bytes.length < sig.length) return false;
-      for (let i = 0; i < sig.length; i++) if (bytes[i] !== sig[i]) return false;
-      return true;
-    }
-
-    function detectMime(bytes) {
-      if (bufferEqualsPrefix(bytes, [0x52, 0x49, 0x46, 0x46])) return 'audio/wav';
-      if (bufferEqualsPrefix(bytes, [0x49, 0x44, 0x33])) return 'audio/mpeg';
-      if (bufferEqualsPrefix(bytes, [0x4F, 0x67, 0x67, 0x53])) return 'audio/ogg';
-      if (bufferEqualsPrefix(bytes, [0x66, 0x4C, 0x61, 0x43])) return 'audio/flac';
-      if (bufferEqualsPrefix(bytes, [0x89, 0x50, 0x4E, 0x47])) return 'image/png';
-      if (bufferEqualsPrefix(bytes, [0x47, 0x49, 0x46, 0x38])) return 'image/gif';
-      if (bufferEqualsPrefix(bytes, [0x42, 0x4D])) return 'image/bmp';
-      if (bufferEqualsPrefix(bytes, [0xFF, 0xD8, 0xFF])) return 'image/jpeg';
-      return 'application/octet-stream';
-    }
-
-    class Reader {
-      constructor(bytes) {
-        this.bytes = u8(bytes);
-        this.dv = new DataView(this.bytes.buffer, this.bytes.byteOffset, this.bytes.byteLength);
-        this.td = new TextDecoder('utf-16le');
-      }
-      check(offset, size) {
-        if (offset + size > this.bytes.length) throw new Error(`範囲外読み取り: ${offset}+${size} > ${this.bytes.length}`);
-      }
-      u8(offset) { this.check(offset, 1); return this.dv.getUint8(offset); }
-      i8(offset) { this.check(offset, 1); return this.dv.getInt8(offset); }
-      u16(offset) { this.check(offset, 2); return this.dv.getUint16(offset, true); }
-      i16(offset) { this.check(offset, 2); return this.dv.getInt16(offset, true); }
-      u32(offset) { this.check(offset, 4); return this.dv.getUint32(offset, true); }
-      i32(offset) { this.check(offset, 4); return this.dv.getInt32(offset, true); }
-      guid(offset) {
-        this.check(offset, 16);
-        const b = this.bytes.slice(offset, offset + 16);
-        const hex = [...b].map(x => x.toString(16).padStart(2, '0'));
-        return `${hex.slice(3,4)}${hex.slice(2,3)}${hex.slice(1,2)}${hex.slice(0,1)}-${hex.slice(5,6)}${hex.slice(4,5)}-${hex.slice(7,8)}${hex.slice(6,7)}-${hex.slice(8,10).join('')}-${hex.slice(10,16).join('')}`;
-      }
-      string(offset) {
-        const numChars = this.u32(offset);
-        const size = 4 + numChars * 2 + (numChars ? 2 : 0);
-        this.check(offset, size);
-        const data = this.bytes.slice(offset + 4, offset + 4 + numChars * 2);
-        return { value: this.td.decode(data), size };
-      }
-      datablock(offset) {
-        const payloadSize = this.u32(offset);
-        const size = payloadSize + 4;
-        this.check(offset, size);
-        return { value: this.bytes.slice(offset + 4, offset + 4 + payloadSize), size };
-      }
-      rect(offset) {
-        return {
-          value: { x1: this.i32(offset), y1: this.i32(offset + 4), x2: this.i32(offset + 8), y2: this.i32(offset + 12) },
-          size: 16,
-        };
-      }
-      rgbquad(offset) {
-        return {
-          value: { r: this.u8(offset), g: this.u8(offset + 1), b: this.u8(offset + 2), a: this.u8(offset + 3) },
-          size: 4,
-        };
-      }
-      list(offset, countValue, countSize, parser, structSizeFn) {
-        const start = offset;
-        const count = typeof countValue === 'function' ? countValue(offset) : countValue;
-        const headerSize = typeof countSize === 'function' ? countSize(count) : countSize;
-        offset += headerSize;
-        const out = [];
+    // Python read_rev: 下位ビットから順に整数を組み立てる
+    readRev(count) {
+        let v = 0;
         for (let i = 0; i < count; i++) {
-          const item = parser(offset);
-          o
+            if (this.readBool()) {
+                v |= (1 << i);
+            }
+        }
+        return v;
+    }
+
+    countConsecutiveOnes(limit) {
+        let count = 0;
+        for (let i = 0; i < limit; i++) {
+            if (this.readBool()) {
+                count++;
+            } else {
+                break;
+            }
+        }
+        return count;
+    }
+
+    get isEOF() {
+        return this.pos >= this.data.length * 8;
+    }
+}
+
+/**
+ * メインの解凍ロジック
+ */
+function decompressLegacyUnused(data, bufferSize) {
+    const stream = new BitStreamLegacyUnused(data);
+    const out = new Uint8Array(bufferSize);
+    let outPos = 0;
+    let totalDecodedCount = 0;
+
+    const _VALUE_BIT_COUNT = [6, 9, 12, 20];
+    const _OFFSET_TO_ADD = [1, 65, 577, 4673];
+
+    // 初期の8ビットをスキップ (Python: stream.read_rev(8))
+    stream.readRev(8);
+
+    while (!stream.isEOF) {
+        if (!stream.readBool()) {
+            // 圧縮されていない1バイト
+            const byte = stream.readRev(8);
+            out[outPos++] = byte;
+            totalDecodedCount++;
+        } else {
+            // コピー開始
+            let bytesToBeDecoded = 2;
+            const seqBits1 = stream.countConsecutiveOnes(3);
+            const valBitCount = _VALUE_BIT_COUNT[seqBits1];
+            let offset = stream.readRev(valBitCount);
+
+            if (valBitCount === 20) {
+                if (offset === 0x000FFFFF) break; // 終了コード
+                bytesToBeDecoded += 1;
+            }
+
+            offset += _OFFSET_TO_ADD[seqBits1];
+
+            const seqBits2 = stream.countConsecutiveOnes(12);
+            const add1 = (1 << seqBits2) - 1;
+            const add2 = stream.readRev(seqBits2);
+            bytesToBeDecoded += (add1 + add2);
+
+            // スライド窓辞書からコピー
+            const sourceIdx = totalDecodedCount - offset;
+            for (let i = 0; i < bytesToBeDecoded; i++) {
+                out[outPos + i] = out[sourceIdx + i];
+            }
+            outPos += bytesToBeDecoded;
+            totalDecodedCount += bytesToBeDecoded;
+        }
+    }
+    return out.slice(0, totalDecodedCount);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════════════════════════════
+
+let acsData = null;
+let decodedImages = {};
+let decodedImageCanvases = {};
+let decodedAudioBuffers = {};
+let currentAnim = null;
+let currentFrameIdx = 0;
+let playTimer = null;
+let playSpeed = 1.0;
+let previewScale = 2;
+let audioContext = null;
+let currentAudioSource = null;
+let gifWorkerBlobUrl = null;
+let webmMuxerModule = null;
+let currentPreviewTimeline = [];
+let lastPreviewTimeline = [];
+let currentSelection = null;
+let currentPlaybackTimeline = null;
+let currentTimelineStep = 0;
+
+function normalizeLocale(locale) {
+  return (locale || '').replace('-', '_');
+}
+
+function getPreferredLocalizedInfo(charInfo) {
+  const byLocale = charInfo.localizedInfoByLocale || {};
+  const candidates = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language])
+    .map(normalizeLocale);
+
+  for (const locale of candidates) {
+    if (byLocale[locale]) return { locale, info: byLocale[locale] };
+    const lang = locale.split('_')[0];
+    const sameLanguage = Object.entries(byLocale).find(([key]) => key.split('_')[0] === lang);
+    if (sameLanguage) return { locale: sameLanguage[0], info: sameLanguage[1] };
+  }
+
+  if (byLocale.en_US) return { locale: 'en_US', info: byLocale.en_US };
+  const first = charInfo.localizedInfos[0];
+  return { locale: first?.locale || '', info: first || { name: 'Unknown', desc: '', extra: '' } };
+}
+
+function escapeHTML(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+function getCanvasContext(canvas, willReadFrequently = false) {
+  return canvas.getContext('2d', { willReadFrequently });
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function getGifWorkerScriptUrl() {
+  if (gifWorkerBlobUrl) return gifWorkerBlobUrl;
+  const response = await fetch(GIF_WORKER_SCRIPT);
+  if (!response.ok) throw new Error(`GIF worker fetch failed: ${response.status}`);
+  const workerSource = await response.text();
+  gifWorkerBlobUrl = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
+  return gifWorkerBlobUrl;
+}
+
+async function getWebMMuxerModule() {
+  if (!webmMuxerModule) webmMuxerModule = await import(WEBM_MUXER_MODULE);
+  return webmMuxerModule;
+}
+
+function clamp16(v) {
+  return Math.max(-32768, Math.min(32767, v));
+}
+
+function readFourCC(bytes, offset) {
+  return String.fromCharCode(bytes[offset], bytes[offset + 1], bytes[offset + 2], bytes[offset + 3]);
+}
+
+function parseWav(bytes) {
+  if (!bytes || bytes.length < 12 || readFourCC(bytes, 0) !== 'RIFF' || readFourCC(bytes, 8) !== 'WAVE') {
+    throw new Error('Invalid RIFF/WAVE audio');
+  }
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  let pos = 12;
+  let fmt = null;
+  let data = null;
+  const chunks = [];
+
+  while (pos + 8 <= bytes.length) {
+    const id = readFourCC(bytes, pos);
+    const size = view.getUint32(pos + 4, true);
+    const body = pos + 8;
+    chunks.push({ id, size, offset: body });
+
+    if (id === 'fmt ') {
+      const extraSize = size > 16 ? view.getUint16(body + 16, true) : 0;
+      const extraOffset = size > 18 ? body + 18 : body + 16;
+      fmt = {
+        tag: view.getUint16(body, true),
+        channels: view.getUint16(body + 2, true),
+        sampleRate: view.getUint32(body + 4, true),
+        byteRate: view.getUint32(body + 8, true),
+        blockAlign: view.getUint16(body + 12, true),
+        bitsPerSample: view.getUint16(body + 14, true),
+        extraSize,
+        extraOffset,
+      };
+      if (fmt.tag === 2 && extraSize >= 4) {
+        fmt.samplesPerBlock = view.getUint16(extraOffset, true);
+        fmt.numCoef = view.getUint16(extraOffset + 2, true);
+        fmt.coefs = [];
+        for (let i = 0; i < fmt.numCoef; i++) {
+          fmt.coefs.push([
+            view.getInt16(extraOffset + 4 + i * 4, true),
+            view.getInt16(extraOffset + 6 + i * 4, true),
+          ]);
+        }
+      }
+    } else if (id === 'data') {
+      data = { offset: body, size };
+    }
+
+    pos = body + size + (size & 1);
+  }
+
+  if (!fmt || !data) throw new Error('WAV is missing fmt or data chunk');
+  return { fmt, data, chunks };
+}
+
+function decodePcmWav(bytes, wav) {
+  const { fmt, data } = wav;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const channels = Array.from({ length: fmt.channels }, () => []);
+  const bytesPerSample = fmt.bitsPerSample / 8;
+  const availableDataSize = Math.max(0, Math.min(data.size, bytes.length - data.offset));
+  const frameCount = Math.floor(availableDataSize / (bytesPerSample * fmt.channels));
+
+  for (let frame = 0; frame < frameCount; frame++) {
+    for (let ch = 0; ch < fmt.channels; ch++) {
+      const offset = data.offset + (frame * fmt.channels + ch) * bytesPerSample;
+      let sample;
+      if (fmt.bitsPerSample === 8) {
+        sample = (bytes[offset] - 128) / 128;
+      } else if (fmt.bitsPerSample === 16) {
+        sample = view.getInt16(offset, true) / 32768;
+      } else {
+        throw new Error(`Unsupported PCM bit depth: ${fmt.bitsPerSample}`);
+      }
+      channels[ch].push(sample);
+    }
+  }
+
+  return { sampleRate: fmt.sampleRate, channels: channels.map(ch => Float32Array.from(ch)) };
+}
+
+function decodeMsAdpcmNibble(nibble, state, coef) {
+  if (nibble & 0x08) nibble -= 0x10;
+  const predicted = ((state.sample1 * coef[0]) + (state.sample2 * coef[1])) / 256;
+  const sample = clamp16(Math.trunc(predicted) + nibble * state.delta);
+  state.sample2 = state.sample1;
+  state.sample1 = sample;
+  state.delta = Math.max(16, Math.trunc((MS_ADPCM_ADAPTATION_TABLE[nibble & 0x0f] * state.delta) / 256));
+  return sample / 32768;
+}
+
+function decodeMsAdpcmWav(bytes, wav) {
+  const { fmt, data } = wav;
+  if (!fmt.samplesPerBlock || !fmt.coefs?.length) throw new Error('Invalid MS ADPCM fmt chunk');
+
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const channels = Array.from({ length: fmt.channels }, () => []);
+  const blockAlign = fmt.blockAlign;
+  let pos = data.offset;
+  const dataEnd = Math.min(data.offset + data.size, bytes.length);
+
+  while (pos + 7 * fmt.channels <= dataEnd) {
+    const blockSize = Math.min(blockAlign, dataEnd - pos);
+    const blockEnd = pos + blockSize;
+    const predictors = [];
+    for (let ch = 0; ch < fmt.channels; ch++) predictors[ch] = bytes[pos++];
+
+    const states = [];
+    for (let ch = 0; ch < fmt.channels; ch++) states[ch] = { delta: view.getInt16(pos + ch * 2, true) };
+    pos += fmt.channels * 2;
+
+    for (let ch = 0; ch < fmt.channels; ch++) states[ch].sample1 = view.getInt16(pos + ch * 2, true);
+    pos += fmt.channels * 2;
+    for (let ch = 0; ch < fmt.channels; ch++) states[ch].sample2 = view.getInt16(pos + ch * 2, true);
+    pos += fmt.channels * 2;
+
+    for (let ch = 0; ch < fmt.channels; ch++) {
+      channels[ch].push(states[ch].sample2 / 32768);
+      channels[ch].push(states[ch].sample1 / 32768);
+    }
+
+    let channelCursor = 0;
+    while (pos < blockEnd) {
+      const byte = bytes[pos++];
+      const nibbles = [byte >> 4, byte & 0x0f];
+      for (const nibble of nibbles) {
+        const ch = channelCursor % fmt.channels;
+        const predictor = Math.min(predictors[ch], fmt.coefs.length - 1);
+        channels[ch].push(decodeMsAdpcmNibble(nibble, states[ch], fmt.coefs[predictor]));
+        channelCursor++;
+      }
+    }
+
+    pos = blockEnd;
+  }
+
+  return { sampleRate: fmt.sampleRate, channels: channels.map(ch => Float32Array.from(ch)) };
+}
+
+function decodeWavToPCM(bytes) {
+  const wav = parseWav(bytes);
+  if (wav.fmt.tag === 1) return { ...decodePcmWav(bytes, wav), wav };
+  if (wav.fmt.tag === 2) return { ...decodeMsAdpcmWav(bytes, wav), wav };
+  throw new Error(`Unsupported WAV codec: 0x${wav.fmt.tag.toString(16)}`);
+}
+
+function audioBufferFromDecoded(audioCtx, decoded) {
+  const length = decoded.channels.reduce((max, ch) => Math.max(max, ch.length), 0);
+  const audioBuffer = audioCtx.createBuffer(decoded.channels.length, length, decoded.sampleRate);
+  decoded.channels.forEach((channel, index) => audioBuffer.copyToChannel(channel, index));
+  return audioBuffer;
+}
+
+function getOrDecodeImage(idx) {
+  if (decodedImages[idx]) return decodedImages[idx];
+  if (!acsData || idx >= acsData.imageLocators.length) return null;
+  try {
+    const img = decodeImage(acsData, idx);
+    if (img) decodedImages[idx] = img;
+    return img;
+  } catch(e) {
+    console.warn(`Image ${idx} decode error:`, e);
+    return null;
+  }
+}
+
+function getImageCanvas(idx) {
+  if (decodedImageCanvases[idx]) return decodedImageCanvases[idx];
+  const img = getOrDecodeImage(idx);
+  if (!img) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = img.w;
+  canvas.height = img.h;
+  getCanvasContext(canvas, true).putImageData(new ImageData(new Uint8ClampedArray(img.rgba), img.w, img.h), 0, 0);
+  decodedImageCanvases[idx] = canvas;
+  return canvas;
+}
+
+function getAudioClip(idx) {
+  if (!acsData || idx === 0xFFFF || idx >= acsData.audioClips.length) return null;
+  const clip = acsData.audioClips[idx];
+  return (clip && clip.length > 0) ? clip : null;
+}
+
+async function getDecodedAudioBuffer(audioCtx, idx) {
+  const clip = getAudioClip(idx);
+  if (!clip) return null;
+
+  try {
+    if (!decodedAudioBuffers[idx]) decodedAudioBuffers[idx] = decodeWavToPCM(clip);
+    return audioBufferFromDecoded(audioCtx, decodedAudioBuffers[idx]);
+  } catch (wavErr) {
+    console.warn('Built-in WAV decoder failed, trying browser decoder:', idx, wavErr);
+    const copy = clip.buffer.slice(clip.byteOffset, clip.byteOffset + clip.byteLength);
+    return await audioCtx.decodeAudioData(copy);
+  }
+}
+
+function createBlankImage(w, h) {
+  return { w, h, rgba: new Uint8ClampedArray(w * h * 4), regionInfo: null, blank: true };
+}
+
+function decodeImage(acs, idx) {
+  const loc = acs.imageLocators[idx];
+  if (!loc) return null;
+  if (loc.size < 9 || loc.address < 0 || loc.address + loc.size > acs.root.length) {
+    return createBlankImage(acs.charInfo.width, acs.charInfo.height);
+  }
+
+  const imageBytes = acs.root.subarray(loc.address, loc.address + loc.size);
+  const imageBuf = new Buffer(imageBytes, acs.root, loc.address);
+  const extraWidth = acs.charInfo.guid === SAEKO_GUID ? 2 : 0;
+  return readImage(imageBuf, acs.charInfo.palette, acs.charInfo.transparencyIndex, extraWidth);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+
+function compositeFrame(anim, frameIdx, scale = 1) {
+  const w = acsData.charInfo.width;
+  const h = acsData.charInfo.height;
+  const canvas = document.createElement('canvas');
+  canvas.width  = w * scale;
+  canvas.height = h * scale;
+  const ctx = getCanvasContext(canvas, true);
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const frame = anim.frames[frameIdx];
+  if (!frame) return canvas;
+
+  // frameImages は index 0 が最前面（kairu-py と同じ順序）
+  // 後ろから描画して前のものを上に
+  for (let i = frame.frameImages.length - 1; i >= 0; i--) {
+    const fi = frame.frameImages[i];
+    const imgCanvas = getImageCanvas(fi.imageIdx);
+    if (!imgCanvas) continue;
+    ctx.drawImage(imgCanvas, fi.x * scale, fi.y * scale, imgCanvas.width * scale, imgCanvas.height * scale);
+  }
+  return canvas;
+}
+
+function renderFrame(anim, frameIdx) {
+  const mainCanvas = document.getElementById('mainCanvas');
+  const w = acsData.charInfo.width;
+  const h = acsData.charInfo.height;
+  mainCanvas.width = w * previewScale;
+  mainCanvas.height = h * previewScale;
+
+  const composed = compositeFrame(anim, frameIdx, previewScale);
+  const ctx = getCanvasContext(mainCanvas);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(composed, 0, 0);
+
+  // frame strip highlight
+  document.querySelectorAll('.frame-thumb').forEach((el, i) => {
+    const step = Number(el.dataset.step);
+    const rawFrameIdx = Number(el.dataset.frameIdx ?? i);
+    const active = currentPlaybackTimeline
+      ? step === currentTimelineStep
+      : rawFrameIdx === frameIdx;
+    el.classList.toggle('active', active);
+  });
+
+  document.getElementById('frameCounter').textContent = currentPlaybackTimeline
+    ? `${currentTimelineStep + 1} / ${currentPlaybackTimeline.length} (#${frameIdx})`
+    : `${frameIdx + 1} / ${anim.frames.length}`;
+
+  // audio indicator
+  const frame = anim.frames[frameIdx];
+  const hasAudio = frame && getAudioClip(frame.audioIdx) !== null;
+  document.getElementById('audioIndicator').className = 'audio-indicator' + (hasAudio ? '' : ' silent');
+  document.getElementById('audioStatus').textContent = hasAudio ? `音声 #${frame.audioIdx}` : '音声なし';
+}
+
+function pickJumpDestination(frame, randValue) {
+  let cumulative = 0;
+  for (const branch of frame.branches) {
+    cumulative += branch.prob;
+    if (randValue < cumulative) return branch.jumpTarget;
+  }
+  return null;
+}
+
+function chooseExportJumpDestination(anim, frameIdx, visitCounts) {
+  const frame = anim.frames[frameIdx];
+  if (!frame.branches.length) return null;
+
+  const straight = frameIdx + 1;
+  const rankedBranches = frame.branches
+    .map(branch => ({ target: branch.jumpTarget, prob: branch.prob }))
+    .filter(candidate => candidate.target >= 0 && candidate.target < anim.frames.length)
+    .sort((a, b) => {
+      const aVisits = visitCounts.get(`${anim.name}:${a.target}`) || 0;
+      const bVisits = visitCounts.get(`${anim.name}:${b.target}`) || 0;
+      if (aVisits !== bVisits) return aVisits - bVisits;
+      if (a.prob !== b.prob) return b.prob - a.prob;
+      return a.target - b.target;
+    });
+
+  const bestBranch = rankedBranches[0];
+  const bestBranchVisits = bestBranch ? (visitCounts.get(`${anim.name}:${bestBranch.target}`) || 0) : 0;
+  const branchProb = frame.branches.reduce((sum, branch) => sum + branch.prob, 0);
+
+  if (bestBranch && bestBranchVisits < 2) return bestBranch.target;
+  if (straight < anim.frames.length) return straight;
+  if (branchProb < 100) return null;
+  return bestBranch?.target ?? null;
+}
+
+function nextFrameState(anim, frameIdx, { mode = 'preview', visitCounts = new Map() } = {}) {
+  const frame = anim.frames[frameIdx];
+  let next = null;
+
+  if (mode === 'export') {
+    next = chooseExportJumpDestination(anim, frameIdx, visitCounts);
+  } else if (frame.branches.length > 0) {
+    next = pickJumpDestination(frame, Math.floor(Math.random() * 100));
+  }
+
+  if (next == null) next = frameIdx + 1;
+
+  if (next >= anim.frames.length) {
+    if (anim.transitionType === USE_RETURN_ANIMATION && anim.returnAnimName) {
+      const returnAnim = acsData.animByName[anim.returnAnimName];
+      if (returnAnim) return { anim: returnAnim, frameIdx: 0, done: false };
+    }
+    return { anim, frameIdx, done: true };
+  }
+
+  return { anim, frameIdx: next, done: false };
+}
+
+function buildPlaybackTimeline(anim, {
+  startFrame = 0,
+  maxFrames = 600,
+  maxDurationMs = 30000,
+  mode = 'export',
+} = {}) {
+  const timeline = [];
+  const visitCounts = new Map();
+  let playingAnim = anim;
+  let frameIdx = startFrame;
+  let elapsedMs = 0;
+
+  for (let step = 0; step < maxFrames && elapsedMs < maxDurationMs; step++) {
+    const frame = playingAnim.frames[frameIdx];
+    if (!frame) break;
+
+    const key = `${playingAnim.name}:${frameIdx}`;
+    visitCounts.set(key, (visitCounts.get(key) || 0) + 1);
+    const durationMs = Math.max(frame.durationCs * 10, 20);
+    timeline.push({ anim: playingAnim, frameIdx, frame, startMs: elapsedMs, durationMs });
+    elapsedMs += durationMs;
+
+    const next = nextFrameState(playingAnim, frameIdx, { mode, visitCounts });
+    if (next.done) break;
+    playingAnim = next.anim;
+    frameIdx = next.frameIdx;
+  }
+
+  return timeline;
+}
+
+function normalizeTimeline(timeline) {
+  let elapsedMs = 0;
+  return timeline.map(entry => {
+    const durationMs = Math.max(entry.durationMs || entry.frame.durationCs * 10, 20);
+    const out = { ...entry, startMs: elapsedMs, durationMs };
+    elapsedMs += durationMs;
+    return out;
+  });
+}
+
+function combinePatternTimelines(patterns, gapMs = PATTERN_GAP_MS) {
+  const combined = [];
+  let elapsedMs = 0;
+  patterns.forEach((pattern, patternIdx) => {
+    const timeline = pattern.timeline || [];
+    for (const entry of timeline) {
+      const durationMs = Math.max(entry.durationMs || entry.frame.durationCs * 10, 20);
+      combined.push({ ...entry, pattern, startMs: elapsedMs, durationMs });
+      elapsedMs += durationMs;
+    }
+    if (patternIdx < patterns.length - 1 && combined.length && gapMs > 0) {
+      combined[combined.length - 1].durationMs += gapMs;
+      elapsedMs += gapMs;
+    }
+  });
+  return combined;
+}
+
+function getFrameChoices(anim, frameIdx) {
+  const frame = anim.frames[frameIdx];
+  if (!frame) return [];
+  const choices = [];
+  let cumulative = 0;
+
+  for (const branch of frame.branches) {
+    const prob = Math.max(0, Math.min(100, branch.prob));
+    if (prob > 0) {
+      choices.push({
+        type: 'branch',
+        frameIdx,
+        target: branch.jumpTarget,
+        prob,
+        label: `#${frameIdx} -> #${branch.jumpTarget} (${prob}%)`,
+      });
+    }
+    cumulative += prob;
+  }
+
+  const residual = Math.max(0, 100 - cumulative);
+  if (!frame.branches.length || residual > 0) {
+    choices.push({
+      type: frame.branches.length ? 'straight' : 'next',
+      frameIdx,
+      target: frameIdx + 1,
+      prob: frame.branches.length ? residual : 100,
+      label: frame.branches.length
+        ? `#${frameIdx} -> #${frameIdx + 1} (${residual}%)`
+        : `#${frameIdx} -> #${frameIdx + 1}`,
+    });
+  }
+
+  return choices;
+}
+
+function resolveAnimationTarget(anim, target) {
+  if (target == null || target < 0) return { anim, frameIdx: target, done: true };
+  if (target >= anim.frames.length) {
+    if (anim.transitionType === USE_RETURN_ANIMATION && anim.returnAnimName) {
+      const returnAnim = acsData?.animByName?.[anim.returnAnimName];
+      if (returnAnim) return { anim: returnAnim, frameIdx: 0, done: false };
+    }
+    return { anim, frameIdx: target, done: true };
+  }
+  return { anim, frameIdx: target, done: false };
+}
+
+function choiceWithLoopEscape(state, choice) {
+  const targetKey = `${state.playingAnim.name}:${choice.target}`;
+  const targetVisits = state.visitCounts.get(targetKey) || 0;
+  const straightTarget = state.frameIdx + 1;
+  if (
+    choice.type === 'branch' &&
+    targetVisits >= 2 &&
+    straightTarget < state.playingAnim.frames.length
+  ) {
+    return {
+      ...choice,
+      type: 'escape',
+      target: straightTarget,
+      prob: 0,
+      label: `#${state.frameIdx} -> #${straightTarget} (loop escape)`,
+    };
+  }
+  return choice;
+}
+
+function patternDecisionText(pattern, maxItems = 4) {
+  const decisions = pattern.decisions || [];
+  if (!decisions.length) return UI_LANG === 'ja' ? '直線再生' : 'linear';
+  const text = decisions.slice(0, maxItems).map(decision => decision.label).join(' / ');
+  return decisions.length > maxItems ? `${text} / ...` : text;
+}
+
+function buildBranchSummary(anim) {
+  const junctions = new Set([0, anim.frames.length]);
+  anim.frames.forEach((frame, idx) => {
+    if (!frame.branches.length) return;
+    junctions.add(idx + 1);
+    for (const branch of frame.branches) {
+      if (branch.jumpTarget >= 0 && branch.jumpTarget <= anim.frames.length) {
+        junctions.add(branch.jumpTarget);
+      }
+    }
+  });
+
+  const points = [...junctions].filter(n => n >= 0 && n <= anim.frames.length).sort((a, b) => a - b);
+  const lines = [];
+  for (let i = 0; i < points.length - 1; i++) {
+    const start = points[i];
+    const end = points[i + 1] - 1;
+    const frame = anim.frames[end];
+    if (!frame) continue;
+    const range = start === end ? `#${start}` : `#${start}-#${end}`;
+    const branches = frame.branches.map(branch => `-> #${branch.jumpTarget} ${branch.prob}%`);
+    const branchTotal = frame.branches.reduce((sum, branch) => sum + branch.prob, 0);
+    if (frame.branches.length && branchTotal < 100) {
+      branches.push(`next ${100 - branchTotal}%`);
+    }
+    lines.push(`${range}: ${branches.length ? branches.join(', ') : 'next'}`);
+  }
+  return lines;
+}
+
+function enumerateAnimationPatterns(anim) {
+  const patterns = [];
+  const signatures = new Set();
+  let limited = false;
+
+  const addPattern = (timeline, decisions, truncated = false) => {
+    if (!timeline.length || patterns.length >= MAX_PATTERN_COUNT) return;
+    const normalized = normalizeTimeline(timeline);
+    const signature = normalized.map(entry => `${entry.anim.name}:${entry.frameIdx}`).join(',');
+    if (signatures.has(signature)) return;
+    signatures.add(signature);
+    patterns.push({
+      index: patterns.length + 1,
+      timeline: normalized,
+      decisions: decisions.slice(),
+      truncated,
+    });
+  };
+
+  const stack = [{
+    playingAnim: anim,
+    frameIdx: 0,
+    timeline: [],
+    decisions: [],
+    visitCounts: new Map(),
+    elapsedMs: 0,
+  }];
+
+  while (stack.length && patterns.length < MAX_PATTERN_COUNT) {
+    const seed = stack.pop();
+    const state = {
+      playingAnim: seed.playingAnim,
+      frameIdx: seed.frameIdx,
+      timeline: seed.timeline.slice(),
+      decisions: seed.decisions.slice(),
+      visitCounts: new Map(seed.visitCounts),
+      elapsedMs: seed.elapsedMs,
+    };
+
+    for (let guard = 0; guard < MAX_PATTERN_FRAMES && state.elapsedMs < MAX_PATTERN_DURATION_MS; guard++) {
+      const frame = state.playingAnim.frames[state.frameIdx];
+      if (!frame) {
+        addPattern(state.timeline, state.decisions);
+        break;
+      }
+
+      const visitKey = `${state.playingAnim.name}:${state.frameIdx}`;
+      state.visitCounts.set(visitKey, (state.visitCounts.get(visitKey) || 0) + 1);
+      const durationMs = Math.max(frame.durationCs * 10, 20);
+      state.timeline.push({
+        anim: state.playingAnim,
+        frameIdx: state.frameIdx,
+        frame,
+        startMs: state.elapsedMs,
+        durationMs,
+      });
+      state.elapsedMs += durationMs;
+
+      const choices = getFrameChoices(state.playingAnim, state.frameIdx);
+      if (!choices.length) {
+        addPattern(state.timeline, state.decisions);
+        break;
+      }
+
+      if (choices.length > 1) {
+        for (const originalChoice of choices.slice().reverse()) {
+          const choice = choiceWithLoopEscape(state, originalChoice);
+          const next = resolveAnimationTarget(state.playingAnim, choice.target);
+          const decisions = state.decisions.concat(choice.type === 'next' ? [] : [choice]);
+          if (next.done) {
+            addPattern(state.timeline, decisions);
+          } else {
+            stack.push({
+              playingAnim: next.anim,
+              frameIdx: next.frameIdx,
+              timeline: state.timeline.slice(),
+              decisions,
+              visitCounts: new Map(state.visitCounts),
+              elapsedMs: state.elapsedMs,
+            });
+          }
+        }
+        break;
+      }
+
+      const choice = choiceWithLoopEscape(state, choices[0]);
+      const next = resolveAnimationTarget(state.playingAnim, choice.target);
+      if (choice.type === 'escape') state.decisions.push(choice);
+      if (next.done) {
+        addPattern(state.timeline, state.decisions);
+        break;
+      }
+      state.playingAnim = next.anim;
+      state.frameIdx = next.frameIdx;
+
+      if (guard === MAX_PATTERN_FRAMES - 1 || state.elapsedMs >= MAX_PATTERN_DURATION_MS) {
+        addPattern(state.timeline, state.decisions, true);
+      }
+    }
+  }
+  if (stack.length || patterns.length >= MAX_PATTERN_COUNT) limited = true;
+
+  if (!patterns.length) {
+    addPattern(buildPlaybackTimeline(anim), [], false);
+  }
+
+  patterns.forEach((pattern, idx) => {
+    pattern.index = idx + 1;
+    pattern.name = UI_LANG === 'ja' ? `パターン ${idx + 1}` : `Pattern ${idx + 1}`;
+    pattern.summary = patternDecisionText(pattern);
+  });
+  patterns.limited = limited;
+  return patterns;
+}
+
+function prepareAnimationPatterns() {
+  if (!acsData) return;
+  let patternCount = 0;
+  let multiPatternAnimations = 0;
+  for (const anim of acsData.animations) {
+    anim.branchSummary = buildBranchSummary(anim);
+    anim.patterns = enumerateAnimationPatterns(anim);
+    anim.patternsLimited = !!anim.patterns.limited;
+    patternCount += anim.patterns.length;
+    if (anim.patterns.length > 1) multiPatternAnimations++;
+  }
+  acsData.analysis.patternCount = patternCount;
+  acsData.analysis.multiPatternAnimations = multiPatternAnimations;
+}
+
+function getAnimationExportTimeline(anim, pattern = null) {
+  if (pattern) return normalizeTimeline(pattern.timeline);
+  if (anim.patterns && anim.patterns.length > 1) return combinePatternTimelines(anim.patterns);
+  return buildPlaybackTimeline(anim);
+}
+
+function getSelectionTimeline(selection = currentSelection) {
+  if (!selection) return currentAnim ? buildPlaybackTimeline(currentAnim) : [];
+  return getAnimationExportTimeline(selection.anim, selection.pattern);
+}
+
+function rememberCurrentPreviewTimeline() {
+  if (currentPreviewTimeline.length) {
+    lastPreviewTimeline = currentPreviewTimeline.slice();
+  }
+}
+
+function getExportTimeline(anim) {
+  if (currentSelection && currentSelection.anim.name === anim.name) {
+    return getSelectionTimeline(currentSelection);
+  }
+  const sameAnim = entry => entry && entry.anim && entry.anim.name === anim.name;
+  if (lastPreviewTimeline.length && sameAnim(lastPreviewTimeline[0])) return lastPreviewTimeline.slice();
+  if (currentPreviewTimeline.length > 1 && sameAnim(currentPreviewTimeline[0])) return currentPreviewTimeline.slice();
+  return getAnimationExportTimeline(anim);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PLAYBACK
+// ═══════════════════════════════════════════════════════════════
+
+function playAnim(anim, startFrame = 0, timeline = null, startStep = 0) {
+  stopAnim();
+  currentPlaybackTimeline = timeline ? normalizeTimeline(timeline) : null;
+  currentTimelineStep = Math.max(0, startStep);
+  if (currentPlaybackTimeline && currentPlaybackTimeline[currentTimelineStep]) {
+    const entry = currentPlaybackTimeline[currentTimelineStep];
+    currentAnim = entry.anim;
+    currentFrameIdx = entry.frameIdx;
+  } else {
+    currentAnim = anim;
+    currentFrameIdx = startFrame;
+  }
+  currentPreviewTimeline = [];
+  renderFrame(currentAnim, currentFrameIdx);
+  scheduleNext();
+}
+
+function scheduleNext() {
+  if (!currentAnim) return;
+  const timelineEntry = currentPlaybackTimeline ? currentPlaybackTimeline[currentTimelineStep] : null;
+  const frame = timelineEntry ? timelineEntry.frame : currentAnim.frames[currentFrameIdx];
+  if (!frame) return;
+
+  const audioIdx = frame.audioIdx;
+  currentPreviewTimeline.push({
+    anim: currentAnim,
+    frameIdx: currentFrameIdx,
+    frame,
+    startMs: currentPreviewTimeline.reduce((sum, entry) => sum + entry.durationMs, 0),
+    durationMs: timelineEntry ? timelineEntry.durationMs : Math.max(frame.durationCs * 10, 20),
+  });
+  const durationMs = timelineEntry ? timelineEntry.durationMs : Math.max(frame.durationCs * 10, 20);
+  if (durationMs > 0 && audioIdx !== 0xFFFF) playAudio(audioIdx);
+  const ms = durationMs > 0 ? durationMs / playSpeed : 0;
+  playTimer = setTimeout(advanceFrame, ms);
+}
+
+function advanceFrame() {
+  if (!currentAnim) return;
+  if (currentPlaybackTimeline) {
+    currentTimelineStep++;
+    const entry = currentPlaybackTimeline[currentTimelineStep];
+    if (!entry) { stopAnim(); return; }
+    currentAnim = entry.anim;
+    currentFrameIdx = entry.frameIdx;
+    renderFrame(currentAnim, currentFrameIdx);
+    scheduleNext();
+    return;
+  }
+  const next = nextFrameState(currentAnim, currentFrameIdx, { mode: 'preview' });
+  if (next.done) { stopAnim(); return; }
+  currentAnim = next.anim;
+  currentFrameIdx = next.frameIdx;
+  renderFrame(currentAnim, currentFrameIdx);
+  scheduleNext();
+}
+
+function stopAnim() {
+  if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+  rememberCurrentPreviewTimeline();
+  if (currentAudioSource) { try { currentAudioSource.stop(); } catch(e){} currentAudioSource = null; }
+}
+
+function playAudio(idx) {
+  if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  getDecodedAudioBuffer(audioContext, idx).then(decoded => {
+    if (!decoded) return;
+    if (currentAudioSource) { try { currentAudioSource.stop(); } catch(e){} }
+    currentAudioSource = audioContext.createBufferSource();
+    currentAudioSource.buffer = decoded;
+    currentAudioSource.connect(audioContext.destination);
+    currentAudioSource.start();
+  }).catch(e => console.warn('Audio decode error:', e));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════════════════════
+
+function loadFile(file) {
+  if (!file) return;
+  setStatus(t('status.loading'), false);
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      acsData = parseCharacterFile(e.target.result, file.name);
+      decodedImages = {};
+      decodedImageCanvases = {};
+      decodedAudioBuffers = {};
+      onFileLoaded();
+    } catch(err) {
+      console.error('ACS parse error:', err);
+      showToast(t('error.exportFailed', { message: err.message }), 'error');
+      setStatus(t('status.error'), false);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function onFileLoaded() {
+  stopAnim();
+  currentSelection = null;
+  currentPlaybackTimeline = null;
+  currentTimelineStep = 0;
+  currentAnim = null;
+  currentFrameIdx = 0;
+  lastPreviewTimeline = [];
+  currentPreviewTimeline = [];
+  prepareAnimationPatterns();
+
+  const ci = acsData.charInfo;
+  const preferred = getPreferredLocalizedInfo(ci);
+  const name = preferred.info.name || 'Unknown';
+  setStatus(t('status.loaded', { name, animations: acsData.animations.length, images: acsData.imageLocators.length, audio: acsData.audioClips.length }), true);
+
+  const infoEl = document.getElementById('charInfo');
+  document.getElementById('charInfoContent').innerHTML = `
+    <div class="info-row"><span>名前</span><span class="info-val">${name}</span></div>
+    <div class="info-row"><span>ロケール</span><span class="info-val">${preferred.locale || '-'}</span></div>
+    <div class="info-row"><span>サイズ</span><span class="info-val">${ci.width}×${ci.height}</span></div>
+    <div class="info-row"><span>パレット</span><span class="info-val">${ci.palette.length}色</span></div>
+    <div class="info-row"><span>アニメ数</span><span class="info-val">${acsData.animations.length}</span></div>
+    <div class="info-row"><span>音声数</span><span class="info-val">${acsData.audioClips.length}</span></div>
+  `;
+  infoEl.style.display = 'block';
+
+  renderAnimList(acsData.animations);
+  renderAudioList();
+  renderOverview();
+
+  document.getElementById('exportContent').style.display = 'block';
+  document.getElementById('exportEmpty').style.display = 'none';
+  document.getElementById('overviewContent').style.display = 'block';
+  document.getElementById('overviewEmpty').style.display = 'none';
+  document.getElementById('audioEmpty').style.display = 'none';
+  applyUILocale(document.body);
+}
+
+function renderOverview() {
+  const ci = acsData.charInfo;
+  const analysis = acsData.analysis || {};
+  const preferred = getPreferredLocalizedInfo(ci);
+  const content = document.getElementById('overviewContent');
+  const stateEntries = Object.entries(ci.stateInfos || {});
+  const branchAnimations = acsData.animations.filter(anim => anim.frames.some(frame => frame.branches.length));
+
+  const localeRows = ci.localizedInfos.map(info => `
+    <tr class="${info.locale === preferred.locale ? 'preferred' : ''}">
+      <td>${escapeHTML(info.locale)}</td>
+      <td>${escapeHTML(info.name)}</td>
+      <td>${escapeHTML(info.desc || '')}</td>
+      <td>${escapeHTML(info.extra || '')}</td>
+    </tr>
+  `).join('');
+
+  const stateRows = stateEntries.map(([state, names]) => `
+    <div class="state-entry"><strong>${escapeHTML(state)}</strong><br>${escapeHTML(names.join(', '))}</div>
+  `).join('');
+
+  const branchRows = branchAnimations.map(anim => {
+    const patternRows = (anim.patterns || []).slice(0, 8).map(pattern => `
+      <div>${escapeHTML(pattern.name)}: ${escapeHTML(pattern.summary)} (${pattern.timeline.length} frames)</div>
+    `).join('');
+    const more = anim.patterns && anim.patterns.length > 8
+      ? `<div>... +${anim.patterns.length - 8}</div>`
+      : '';
+    return `
+      <div class="branch-entry">
+        <strong>${escapeHTML(anim.name)}</strong>
+        <span> · ${anim.patterns?.length || 1}${anim.patternsLimited ? '+' : ''} patterns · ${anim.frames.filter(frame => frame.branches.length).length} branch frames</span>
+        <pre>${escapeHTML((anim.branchSummary || []).join('\n'))}</pre>
+        <div class="pattern-summary">${patternRows}${more}</div>
+      </div>
+    `;
+  }).join('');
+
+  content.innerHTML = `
+    <div class="overview-grid">
+      <section class="overview-panel">
+        <div class="overview-title">ファイル</div>
+        <div class="kv-row"><span>形式</span><span>${escapeHTML(acsData.format || 'ACS')}</span></div>
+        <div class="kv-row"><span>表示名</span><span>${escapeHTML(preferred.info.name || 'Unknown')}</span></div>
+        <div class="kv-row"><span>選択ロケール</span><span>${escapeHTML(preferred.locale || '-')}</span></div>
+        <div class="kv-row"><span>GUID</span><span>${escapeHTML(ci.guid)}</span></div>
+      </section>
+      <section class="overview-panel">
+        <div class="overview-title">データ</div>
+        <div class="kv-row"><span>キャラクターサイズ</span><span>${ci.width}×${ci.height}</span></div>
+        <div class="kv-row"><span>透明色Index</span><span>${ci.transparencyIndex}</span></div>
+        <div class="kv-row"><span>パレット</span><span>${ci.palette.length}</span></div>
+        <div class="kv-row"><span>アニメーション</span><span>${acsData.animations.length}</span></div>
+        <div class="kv-row"><span>パターン</span><span>${analysis.patternCount || acsData.animations.length}</span></div>
+        <div class="kv-row"><span>複数パターン</span><span>${analysis.multiPatternAnimations || 0}</span></div>
+        <div class="kv-row"><span>フレーム画像</span><span>${acsData.imageLocators.length}</span></div>
+        <div class="kv-row"><span>音声</span><span>${acsData.audioClips.length}</span></div>
+        <div class="kv-row"><span>状態</span><span>${stateEntries.length}</span></div>
+      </section>
+    </div>
+
+    <div class="overview-panel" style="margin-top:12px">
+      <div class="overview-title">ロケール別情報</div>
+      <table class="locale-table">
+        <thead><tr><th>Locale</th><th>Name</th><th>Description</th><th>Extra</th></tr></thead>
+        <tbody>${localeRows || '<tr><td colspan="4">ロケール情報なし</td></tr>'}</tbody>
+      </table>
+    </div>
+
+    <div class="overview-panel" style="margin-top:12px">
+      <div class="overview-title">状態とアニメーション</div>
+      <div class="state-list">${stateRows || '<div class="state-entry">状態情報なし</div>'}</div>
+    </div>
+
+    <div class="overview-panel" style="margin-top:12px">
+      <div class="overview-title">分岐とパターン</div>
+      <div class="state-list">${branchRows || '<div class="state-entry">分岐なし</div>'}</div>
+    </div>
+  `;
+}
+
+function renderAnimList(anims) {
+  const list = document.getElementById('animList');
+  list.innerHTML = '';
+  for (const anim of anims) {
+    const div = document.createElement('div');
+    div.className = 'anim-item';
+    div.dataset.animName = anim.name;
+    div.dataset.patternIndex = '';
+    const patternCount = anim.patterns?.length || 1;
+    div.innerHTML = `<span class="anim-icon">▶</span><span class="anim-name">${escapeHTML(anim.name)}</span><span class="anim-frames">${anim.frames.length}f${patternCount > 1 ? ` · ${patternCount}${anim.patternsLimited ? '+' : ''}p` : ''}</span>`;
+    div.onclick = () => selectAnim(anim, div, null);
+    list.appendChild(div);
+
+    if (patternCount > 1) {
+      for (const pattern of anim.patterns) {
+        const patternDiv = document.createElement('div');
+        patternDiv.className = 'anim-item pattern-item';
+        patternDiv.dataset.animName = anim.name;
+        patternDiv.dataset.patternIndex = String(pattern.index);
+        patternDiv.innerHTML = `<span class="anim-icon">↳</span><span class="anim-name">${escapeHTML(pattern.name)}</span><span class="anim-frames">${pattern.timeline.length}f</span>`;
+        patternDiv.title = pattern.summary;
+        patternDiv.onclick = () => selectAnim(anim, patternDiv, pattern);
+        list.appendChild(patternDiv);
+      }
+    }
+  }
+  syncActiveAnimItems();
+}
+
+function selectionMatches(anim, pattern = null) {
+  if (!currentSelection) return false;
+  return currentSelection.anim.name === anim.name &&
+    ((currentSelection.pattern?.index || '') === (pattern?.index || ''));
+}
+
+function syncActiveAnimItems() {
+  document.querySelectorAll('.anim-item').forEach(item => {
+    const active = currentSelection &&
+      item.dataset.animName === currentSelection.anim.name &&
+      item.dataset.patternIndex === String(currentSelection.pattern?.index || '');
+    item.classList.toggle('active', active);
+  });
+}
+
+function renderPatternSelector(anim, selectedPattern = null) {
+  const panel = document.getElementById('patternPanel');
+  const list = document.getElementById('patternList');
+  const patterns = anim.patterns || [];
+  list.innerHTML = '';
+  panel.classList.toggle('visible', patterns.length > 1);
+  if (patterns.length <= 1) return;
+
+  const allButton = document.createElement('button');
+  allButton.className = 'pattern-chip' + (!selectedPattern ? ' active' : '');
+  allButton.innerHTML = `<span>${UI_LANG === 'ja' ? 'すべてのパターン' : 'All patterns'}</span><small>${patterns.length}${anim.patternsLimited ? '+' : ''} patterns / ${combinePatternTimelines(patterns).length} frames</small>`;
+  allButton.onclick = () => selectAnim(anim, null, null);
+  list.appendChild(allButton);
+
+  for (const pattern of patterns) {
+    const button = document.createElement('button');
+    button.className = 'pattern-chip' + (selectedPattern?.index === pattern.index ? ' active' : '');
+    button.innerHTML = `<span>${escapeHTML(pattern.name)}</span><small>${escapeHTML(pattern.summary)} / ${pattern.timeline.length} frames</small>`;
+    button.onclick = () => selectAnim(anim, null, pattern);
+    list.appendChild(button);
+  }
+}
+
+function renderFrameStrip(anim, timeline) {
+  const strip = document.getElementById('frameStrip');
+  strip.innerHTML = '';
+  const entries = timeline && timeline.length
+    ? timeline
+    : anim.frames.map((frame, frameIdx) => ({
+        anim,
+        frameIdx,
+        frame,
+        startMs: 0,
+        durationMs: Math.max(frame.durationCs * 10, 20),
+      }));
+  document.getElementById('frameCount').textContent = timeline
+    ? `${entries.length} steps`
+    : `${anim.frames.length}f`;
+
+  const visibleEntries = entries.slice(0, MAX_FRAME_STRIP_ITEMS);
+  const thumbTasks = [];
+  for (let i = 0; i < visibleEntries.length; i++) {
+    const entry = visibleEntries[i];
+    const div = document.createElement('div');
+    div.className = 'frame-thumb';
+    div.dataset.step = String(i);
+    div.dataset.frameIdx = String(entry.frameIdx);
+    const patternName = entry.pattern ? `<div>${escapeHTML(entry.pattern.name)}</div>` : '';
+    div.innerHTML = `<canvas width="48" height="48"></canvas>
+      <div class="frame-meta">
+        <div class="f-idx">#${entry.frameIdx}</div>
+        <div>${(entry.durationMs / 1000).toFixed(2)}s</div>
+        <div>${entry.frame.frameImages.length}img</div>
+        ${patternName}
+      </div>`;
+    const thumbCanvas = div.querySelector('canvas');
+    div.onclick = () => {
+      stopAnim();
+      currentPlaybackTimeline = timeline ? normalizeTimeline(timeline) : null;
+      currentTimelineStep = i;
+      currentAnim = entry.anim;
+      currentFrameIdx = entry.frameIdx;
+      renderFrame(entry.anim, entry.frameIdx);
+    };
+    strip.appendChild(div);
+    thumbTasks.push({ entry, thumbCanvas });
+  }
+
+  if (entries.length > visibleEntries.length) {
+    const more = document.createElement('div');
+    more.className = 'frame-thumb';
+    more.innerHTML = `<div class="frame-meta"><div class="f-idx">+${entries.length - visibleEntries.length}</div><div>${UI_LANG === 'ja' ? '残りのフレームは再生/書き出しに含まれます' : 'More frames are included in playback/export'}</div></div>`;
+    strip.appendChild(more);
+  }
+
+  const renderThumbBatch = start => {
+    const end = Math.min(start + 24, thumbTasks.length);
+    for (let i = start; i < end; i++) {
+      const { entry, thumbCanvas } = thumbTasks[i];
+      const c = compositeFrame(entry.anim, entry.frameIdx, 1);
+      const tw = acsData.charInfo.width, th = acsData.charInfo.height;
+      const sc = Math.min(48 / tw, 48 / th);
+      const dx = (48 - tw * sc) / 2, dy = (48 - th * sc) / 2;
+      const ctx = getCanvasContext(thumbCanvas);
+      ctx.clearRect(0, 0, 48, 48);
+      ctx.drawImage(c, 0, 0, c.width, c.height, dx, dy, tw * sc, th * sc);
+    }
+    if (end < thumbTasks.length) setTimeout(() => renderThumbBatch(end), 16);
+  };
+  renderThumbBatch(0);
+}
+
+function selectAnim(anim, el, pattern = null) {
+  currentSelection = { anim, pattern };
+  syncActiveAnimItems();
+  if (el) el.classList.add('active');
+  currentAnim = anim;
+
+  document.getElementById('viewerEmpty').style.display = 'none';
+  document.getElementById('viewerLayout').style.display = 'grid';
+
+  const timeline = getSelectionTimeline(currentSelection);
+  renderPatternSelector(anim, pattern);
+  renderFrameStrip(anim, timeline);
+  playAnim(anim, timeline[0]?.frameIdx || 0, timeline, 0);
+}
+
+function renderAudioList() {
+  const list = document.getElementById('audioList');
+  list.style.display = 'flex';
+  list.innerHTML = '';
+  for (let i = 0; i < acsData.audioClips.length; i++) {
+    const clip = acsData.audioClips[i];
+    const info = acsData.audioInfos?.[i];
+    const div = document.createElement('div');
+    div.className = 'audio-item';
+    div.innerHTML = `
+      <div class="audio-item-icon">🔊</div>
+      <div class="audio-item-info">
+        <div class="audio-item-name">音声 #${i}</div>
+        <div class="audio-item-meta">${clip.length.toLocaleString()} bytes · ${info ? `${info.codec} · ${info.sampleRate || '-'} Hz` : 'WAV'}</div>
+      </div>
+      <div class="audio-item-actions">
+        <button class="btn" onclick="playAudioById(${i})">▶ 再生</button>
+        <button class="btn" onclick="downloadAudio(${i})">⬇ DL</button>
+      </div>`;
+    list.appendChild(div);
+  }
+}
+
+function renderImagesGrid() {
+  const grid = document.getElementById('imagesGrid');
+  const inner = document.getElementById('imagesGridInner');
+  const empty = document.getElementById('imagesEmpty');
+  if (!acsData) return;
+
+  empty.style.display = 'none';
+  grid.style.display = 'flex';
+  inner.innerHTML = '';
+
+  for (let i = 0; i < acsData.imageLocators.length; i++) {
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'border:1px solid var(--border);border-radius:4px;padding:4px;background:var(--surface);cursor:pointer;';
+    const c = document.createElement('canvas');
+    c.style.cssText = 'width:100%;display:block;image-rendering:pixelated;';
+    wrap.appendChild(c);
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:0.55rem;color:var(--text-dimmer);text-align:center;padding-top:2px;';
+    label.textContent = `#${i}`;
+    wrap.appendChild(label);
+    inner.appendChild(wrap);
+
+    const idx = i;
+    setTimeout(() => {
+      const img = getOrDecodeImage(idx);
+      if (!img) return;
+      c.width = img.w; c.height = img.h;
+      getCanvasContext(c, true).putImageData(new ImageData(img.rgba, img.w, img.h), 0, 0);
+    }, idx * 3);
+  }
+}
+
+function playAudioById(idx) { playAudio(idx); }
+
+function downloadAudio(idx) {
+  const clip = getAudioClip(idx);
+  if (!clip) { showToast('音声データなし', 'error'); return; }
+  const blob = new Blob([clip], { type: 'audio/wav' });
+  downloadBlob(blob, `audio_${idx}.wav`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════════
+
+function safeFilePart(name) {
+  return String(name || 'animation').replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, '_');
+}
+
+function currentExportName(ext) {
+  const selection = currentSelection || (currentAnim ? { anim: currentAnim, pattern: null } : null);
+  if (!selection) return `animation.${ext}`;
+  const suffix = selection.pattern
+    ? `_pattern_${String(selection.pattern.index).padStart(2, '0')}`
+    : (selection.anim.patterns && selection.anim.patterns.length > 1 ? '_patterns' : '');
+  return `${safeFilePart(selection.anim.name)}${suffix}.${ext}`;
+}
+
+async function exportGIF() {
+  if (!currentAnim) { showToast(t('error.selectAnimation'), 'error'); return; }
+  const scale = parseInt(document.getElementById('gifScale').value);
+  const loop  = parseInt(document.getElementById('gifLoop').value);
+  try {
+    const selection = currentSelection || { anim: currentAnim, pattern: null };
+    await generateGIF(selection.anim, scale, loop, currentExportName('gif'), getSelectionTimeline(selection));
+  } catch (err) {
+    hideProgress();
+    console.error('GIF export error:', err);
+    showToast(t('error.exportFailed', { message: err.message }), 'error');
+  }
+}
+
+async function generateGIF(anim, scale, loop, filename, timeline = null) {
+  const w = acsData.charInfo.width * scale;
+  const h = acsData.charInfo.height * scale;
+  timeline = timeline || getAnimationExportTimeline(anim);
+  showProgress(t('progress.gif'), 0);
+  const workerScript = await getGifWorkerScriptUrl();
+  return new Promise((resolve, reject) => {
+    const gif = new GIF({
+      workers: 2,
+      workerScript,
+      quality: 10,
+      width: w,
+      height: h,
+      repeat: loop,
+      transparent: 0,
+    });
+    const timeout = setTimeout(() => {
+      hideProgress();
+      reject(new Error(t('error.gifTimeout')));
+    }, 180000);
+    for (let i = 0; i < timeline.length; i++) {
+      const entry = timeline[i];
+      const c = compositeFrame(entry.anim, entry.frameIdx, scale);
+      const delay = entry.durationMs;
+      gif.addFrame(c, { delay, copy: true, dispose: 2 });
+      updateProgress(((i + 1) / timeline.length) * 80, t('progress.frameOf', { current: i + 1, total: timeline.length }));
+    }
+    gif.on('progress', p => updateProgress(80 + p * 20, t('progress.encoding')));
+    gif.on('finished', blob => {
+      clearTimeout(timeout);
+      hideProgress();
+      downloadBlob(blob, filename);
+      showToast(t('toast.exportDone', { filename }), 'success');
+      resolve(blob);
+    });
+    try {
+      gif.render();
+    } catch (err) {
+      clearTimeout(timeout);
+      hideProgress();
+      reject(err);
+    }
+  });
+}
+
+async function exportPNGSequence() {
+  if (!currentAnim) { showToast('アニメーションを選択してください', 'error'); return; }
+  const scale = parseInt(document.getElementById('pngScale').value);
+  const transparent = document.getElementById('pngTransparent').checked;
+  await generatePNGZip([currentAnim], scale, transparent, `${currentAnim.name}_frames.zip`);
+}
+
+async function generatePNGZip(anims, scale, transparent, filename) {
+  const zip = new JSZip();
+  const total = anims.reduce((s,a) => s + a.frames.length, 0);
+  let done = 0;
+  showProgress('PNG 生成中...', 0);
+  for (const anim of anims) {
+    const folder = anims.length > 1 ? zip.folder(anim.name) : zip;
+    for (let i = 0; i < anim.frames.length; i++) {
+      let c = compositeFrame(anim, i, scale);
+      if (!transparent) {
+        const bg = document.createElement('canvas');
+        bg.width = c.width; bg.height = c.height;
+        const bgCtx = getCanvasContext(bg);
+        bgCtx.fillStyle = 'white'; bgCtx.fillRect(0, 0, bg.width, bg.height);
+        bgCtx.drawImage(c, 0, 0);
+        c = bg;
+      }
+      const blob = await canvasToBlob(c);
+      folder.file(`frame_${String(i).padStart(4,'0')}.png`, await blob.arrayBuffer());
+      done++;
+      updateProgress((done/total)*90, `${anim.name} ${i+1}/${anim.frames.length}`);
+    }
+  }
+  updateProgress(95, 'ZIP圧縮中...');
+  const blob = await zip.generateAsync({ type: 'blob' });
+  hideProgress();
+  downloadBlob(blob, filename);
+  showToast(`${filename} 書き出し完了`, 'success');
+}
+
+async function exportWebPFrames() {
+  if (!currentAnim) { showToast('アニメーションを選択してください', 'error'); return; }
+  const scale   = parseInt(document.getElementById('webpScale').value);
+  const quality = parseFloat(document.getElementById('webpQuality').value);
+  const zip = new JSZip();
+  showProgress('WebP 生成中...', 0);
+  for (let i = 0; i < currentAnim.frames.length; i++) {
+    const c = compositeFrame(currentAnim, i, scale);
+    const blob = await new Promise(r => c.toBlob(r, 'image/webp', quality));
+    zip.file(`frame_${String(i).padStart(4,'0')}.webp`, await blob.arrayBuffer());
+    updateProgress(((i+1)/currentAnim.frames.length)*90, `フレーム ${i+1}`);
+  }
+  updateProgress(95, 'ZIP圧縮中...');
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  hideProgress();
+  downloadBlob(zipBlob, `${currentAnim.name}_webp.zip`);
+  showToast('WebP ZIP 書き出し完了', 'success');
+}
+
+function pickVideoMime(format) {
+  const mp4Types = [
+    'video/mp4;codecs="avc1.42E01E,mp4a.40.2"',
+    'video/mp4;codecs="avc1.42E01E"',
+    'video/mp4',
+  ];
+  const webmTypes = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+  ];
+  const candidates = format === 'mp4' ? mp4Types : webmTypes;
+  return candidates.find(type => window.MediaRecorder && MediaRecorder.isTypeSupported(type)) || '';
+}
+
+async function exportVideo() {
+  if (!currentAnim) { showToast(t('error.selectAnimation'), 'error'); return; }
+  const scale = parseInt(document.getElementById('videoScale').value, 10);
+  const format = document.getElementById('videoFormat').value;
+  try {
+    const selection = currentSelection || { anim: currentAnim, pattern: null };
+    const timeline = getSelectionTimeline(selection);
+    if (format === 'webm') {
+      try {
+        await generateFastWebM(selection.anim, scale, currentExportName(format), timeline);
+        return;
+      } catch (fastErr) {
+        console.warn('Fast WebM export failed, falling back to MediaRecorder:', fastErr);
+        hideProgress();
+        showToast(UI_LANG === 'ja' ? '高速WebMが使えないため通常書き出しに切り替えます' : 'Fast WebM is unavailable; falling back to realtime export', 'info');
+      }
+    }
+    await generateVideo(selection.anim, scale, format, currentExportName(format), timeline);
+  } catch (err) {
+    hideProgress();
+    console.error('Video export error:', err);
+    showToast(t('error.exportFailed', { message: err.message }), 'error');
+  }
+}
+
+async function decodeAudioForExport(audioCtx, idx) {
+  try {
+    return await getDecodedAudioBuffer(audioCtx, idx);
+  } catch (err) {
+    console.warn('Audio export decode error:', idx, err);
+    return null;
+  }
+}
+
+function getDecodedAudioPCM(idx) {
+  const clip = getAudioClip(idx);
+  if (!clip) return null;
+  if (!decodedAudioBuffers[idx]) decodedAudioBuffers[idx] = decodeWavToPCM(clip);
+  return decodedAudioBuffers[idx];
+}
+
+function sampleDecodedChannel(decoded, channelIdx, samplePos) {
+  const channels = decoded.channels;
+  const channel = channels[Math.min(channelIdx, channels.length - 1)] || channels[0];
+  if (!channel || !channel.length) return 0;
+  const i0 = Math.floor(samplePos);
+  if (i0 < 0 || i0 >= channel.length) return 0;
+  const i1 = Math.min(i0 + 1, channel.length - 1);
+  const frac = samplePos - i0;
+  return channel[i0] * (1 - frac) + channel[i1] * frac;
+}
+
+function mixTimelineAudio(timeline, audioByIndex, sampleRate = 48000, channels = 2) {
+  let durationMs = timeline.length
+    ? timeline[timeline.length - 1].startMs + timeline[timeline.length - 1].durationMs
+    : 0;
+  for (const entry of timeline) {
+    const decoded = audioByIndex.get(entry.frame.audioIdx);
+    if (!decoded) continue;
+    durationMs = Math.max(durationMs, entry.startMs + decoded.channels[0].length / decoded.sampleRate * 1000);
+  }
+
+  const sampleCount = Math.max(1, Math.ceil(durationMs * sampleRate / 1000));
+  const mix = Array.from({ length: channels }, () => new Float32Array(sampleCount));
+
+  for (const entry of timeline) {
+    const decoded = audioByIndex.get(entry.frame.audioIdx);
+    if (!decoded) continue;
+    const startSample = Math.round(entry.startMs * sampleRate / 1000);
+    const outSamples = Math.min(
+      sampleCount - startSample,
+      Math.ceil(decoded.channels[0].length * sampleRate / decoded.sampleRate),
+    );
+    for (let i = 0; i < outSamples; i++) {
+      const sourcePos = i * decoded.sampleRate / sampleRate;
+      for (let ch = 0; ch < channels; ch++) {
+        mix[ch][startSample + i] += sampleDecodedChannel(decoded, ch, sourcePos);
+      }
+    }
+  }
+
+  return { channels: mix, sampleRate, sampleCount, durationMs };
+}
+
+async function generateFastWebM(anim, scale, filename, timeline = null) {
+  if (!window.VideoEncoder || !window.VideoFrame) throw new Error('WebCodecs VideoEncoder is not available');
+  if (!window.isSecureContext) throw new Error('WebCodecs requires a secure context');
+  timeline = timeline || getAnimationExportTimeline(anim);
+  if (!timeline.length) throw new Error('No frames to export');
+
+  const w = acsData.charInfo.width * scale;
+  const h = acsData.charInfo.height * scale;
+  const videoConfig = { codec: 'vp8', width: w, height: h, bitrate: 4_000_000, framerate: 60 };
+  const videoSupport = await VideoEncoder.isConfigSupported(videoConfig);
+  if (!videoSupport.supported) throw new Error('VP8 WebCodecs encoder is not supported');
+
+  showProgress(t('progress.video'), 0, 'WebCodecs');
+  const { Muxer, ArrayBufferTarget } = await getWebMMuxerModule();
+
+  const uniqueAudio = [...new Set(timeline.map(entry => entry.frame.audioIdx).filter(idx => getAudioClip(idx)))];
+  const audioByIndex = new Map();
+  for (const idx of uniqueAudio) {
+    try {
+      const decoded = getDecodedAudioPCM(idx);
+      if (decoded) audioByIndex.set(idx, decoded);
+    } catch (err) {
+      console.warn('Fast audio decode error:', idx, err);
+    }
+  }
+
+  const wantsAudio = audioByIndex.size > 0;
+  let canEncodeAudio = false;
+  if (wantsAudio && window.AudioEncoder && window.AudioData) {
+    try {
+      const audioSupport = await AudioEncoder.isConfigSupported({
+        codec: 'opus',
+        sampleRate: 48000,
+        numberOfChannels: 2,
+        bitrate: 128_000,
+      });
+      canEncodeAudio = !!audioSupport.supported;
+    } catch (err) {
+      canEncodeAudio = false;
+    }
+  }
+  if (wantsAudio && !canEncodeAudio) {
+    throw new Error('Opus WebCodecs audio encoder is not supported');
+  }
+
+  const target = new ArrayBufferTarget();
+  const muxer = new Muxer({
+    target,
+    video: { codec: 'V_VP8', width: w, height: h, frameRate: 60 },
+    audio: canEncodeAudio ? { codec: 'A_OPUS', numberOfChannels: 2, sampleRate: 48000 } : undefined,
+    firstTimestampBehavior: 'offset',
+  });
+
+  const encodedPackets = [];
+  let encoderError = null;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = getCanvasContext(canvas);
+  ctx.imageSmoothingEnabled = false;
+
+  const videoEncoder = new VideoEncoder({
+    output: (chunk, meta) => encodedPackets.push({ kind: 'video', chunk, meta, timestamp: chunk.timestamp }),
+    error: err => { encoderError = err; },
+  });
+  videoEncoder.configure(videoConfig);
+
+  let lastKeyframeUs = -Infinity;
+  for (let i = 0; i < timeline.length; i++) {
+    const entry = timeline[i];
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(compositeFrame(entry.anim, entry.frameIdx, scale), 0, 0);
+    const timestamp = Math.round(entry.startMs * 1000);
+    const duration = Math.max(1000, Math.round(entry.durationMs * 1000));
+    const frame = new VideoFrame(canvas, { timestamp, duration });
+    const keyFrame = i === 0 || timestamp - lastKeyframeUs >= 30_000_000;
+    if (keyFrame) lastKeyframeUs = timestamp;
+    videoEncoder.encode(frame, { keyFrame });
+    frame.close();
+    if (videoEncoder.encodeQueueSize > 30) await sleep(0);
+    updateProgress((i / timeline.length) * 45, t('progress.frameOf', { current: i + 1, total: timeline.length }));
+  }
+  await videoEncoder.flush();
+  videoEncoder.close();
+  if (encoderError) throw encoderError;
+
+  if (canEncodeAudio) {
+    const mixed = mixTimelineAudio(timeline, audioByIndex, 48000, 2);
+    const audioEncoder = new AudioEncoder({
+      output: (chunk, meta) => encodedPackets.push({ kind: 'audio', chunk, meta, timestamp: chunk.timestamp }),
+      error: err => { encoderError = err; },
+    });
+    audioEncoder.configure({ codec: 'opus', sampleRate: 48000, numberOfChannels: 2, bitrate: 128_000 });
+    const chunkFrames = 960; // 20ms for Opus at 48kHz
+    for (let offset = 0; offset < mixed.sampleCount; offset += chunkFrames) {
+      const frames = Math.min(chunkFrames, mixed.sampleCount - offset);
+      const planar = new Float32Array(frames * 2);
+      for (let i = 0; i < frames; i++) {
+        planar[i] = Math.max(-1, Math.min(1, mixed.channels[0][offset + i]));
+        planar[frames + i] = Math.max(-1, Math.min(1, mixed.channels[1][offset + i]));
+      }
+      const audioData = new AudioData({
+        format: 'f32-planar',
+        sampleRate: 48000,
+        numberOfFrames: frames,
+        numberOfChannels: 2,
+        timestamp: Math.round(offset / 48000 * 1_000_000),
+        data: planar,
+      });
+      audioEncoder.encode(audioData);
+      audioData.close();
+      if (audioEncoder.encodeQueueSize > 20) await sleep(0);
+      updateProgress(45 + (offset / mixed.sampleCount) * 35, t('progress.encoding'));
+    }
+    await audioEncoder.flush();
+    audioEncoder.close();
+    if (encoderError) throw encoderError;
+  }
+
+  encodedPackets.sort((a, b) => (a.timestamp - b.timestamp) || (a.kind === 'video' ? -1 : 1));
+  for (const packet of encodedPackets) {
+    if (packet.kind === 'video') muxer.addVideoChunk(packet.chunk, packet.meta, packet.timestamp);
+    else muxer.addAudioChunk(packet.chunk, packet.meta, packet.timestamp);
+  }
+  updateProgress(92, t('progress.encoding'));
+  muxer.finalize();
+  const blob = new Blob([target.buffer], { type: 'video/webm' });
+  hideProgress();
+  downloadBlob(blob, filename);
+  showToast(t('toast.exportDone', { filename }), 'success');
+  return blob;
+}
+
+async function generateVideo(anim, scale, format, filename, timeline = null) {
+  if (!window.MediaRecorder) throw new Error('MediaRecorder is not available');
+  const mimeType = pickVideoMime(format);
+  if (!mimeType) throw new Error(t('error.videoUnsupported'));
+  timeline = timeline || getAnimationExportTimeline(anim);
+
+  const w = acsData.charInfo.width * scale;
+  const h = acsData.charInfo.height * scale;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = getCanvasContext(canvas);
+  ctx.imageSmoothingEnabled = false;
+
+  showProgress(t('progress.video'), 0);
+
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  await audioCtx.resume();
+  const audioDest = audioCtx.createMediaStreamDestination();
+  const uniqueAudio = [...new Set(timeline.map(entry => entry.frame.audioIdx).filter(idx => getAudioClip(idx)))];
+  const audioBuffers = new Map();
+  for (const idx of uniqueAudio) {
+    const decoded = await decodeAudioForExport(audioCtx, idx);
+    if (decoded) audioBuffers.set(idx, decoded);
+  }
+  if (uniqueAudio.length && audioBuffers.size < uniqueAudio.length) {
+    showToast(t('error.audioDecode'), 'error');
+  }
+
+  const canvasStream = canvas.captureStream(60);
+  const videoTrack = canvasStream.getVideoTracks()[0];
+  const stream = new MediaStream([
+    videoTrack,
+    ...audioDest.stream.getAudioTracks(),
+  ]);
+  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 4_000_000 });
+  const chunks = [];
+  recorder.ondataavailable = event => {
+    if (event.data && event.data.size) chunks.push(event.data);
+  };
+
+  const stopped = new Promise(resolve => {
+    recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
+  });
+
+  ctx.clearRect(0, 0, w, h);
+  if (timeline[0]) ctx.drawImage(compositeFrame(timeline[0].anim, timeline[0].frameIdx, scale), 0, 0);
+
+  recorder.start(250);
+  const audioStartTime = audioCtx.currentTime + 0.2;
+  const visualStartTime = performance.now() + 200;
+
+  for (const entry of timeline) {
+    const decoded = audioBuffers.get(entry.frame.audioIdx);
+    if (decoded) {
+      const source = audioCtx.createBufferSource();
+      source.buffer = decoded;
+      source.connect(audioDest);
+      source.start(audioStartTime + entry.startMs / 1000);
+    }
+  }
+
+  const waitUntil = async target => {
+    const delay = target - performance.now();
+    if (delay > 0) await sleep(delay);
+  };
+
+  for (let i = 0; i < timeline.length; i++) {
+    const entry = timeline[i];
+    await waitUntil(visualStartTime + entry.startMs);
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(compositeFrame(entry.anim, entry.frameIdx, scale), 0, 0);
+    if (videoTrack.requestFrame) videoTrack.requestFrame();
+    updateProgress(((i + 1) / timeline.length) * 90, t('progress.frameOf', { current: i + 1, total: timeline.length }));
+  }
+
+  const endMs = timeline.length ? timeline[timeline.length - 1].startMs + timeline[timeline.length - 1].durationMs : 0;
+  await waitUntil(visualStartTime + endMs + 150);
+  recorder.stop();
+  const blob = await stopped;
+  stream.getTracks().forEach(track => track.stop());
+  await audioCtx.close();
+  hideProgress();
+  downloadBlob(blob, filename);
+  showToast(t('toast.exportDone', { filename }), 'success');
+  return blob;
+}
+
+async function exportSpritesheet() {
+  if (!currentAnim) { showToast('アニメーションを選択してください', 'error'); return; }
+  const cols  = parseInt(document.getElementById('sheetCols').value);
+  const scale = parseInt(document.getElementById('sheetScale').value);
+  const fw = acsData.charInfo.width * scale;
+  const fh = acsData.charInfo.height * scale;
+  const rows = Math.ceil(currentAnim.frames.length / cols);
+  const canvas = document.createElement('canvas');
+  canvas.width = fw * cols; canvas.height = fh * rows;
+  const ctx = getCanvasContext(canvas);
+  showProgress('スプライトシート生成中...', 0);
+  for (let i = 0; i < currentAnim.frames.length; i++) {
+    const c = compositeFrame(currentAnim, i, scale);
+    ctx.drawImage(c, (i % cols) * fw, Math.floor(i / cols) * fh);
+    updateProgress(((i+1)/currentAnim.frames.length)*90, `フレーム ${i+1}`);
+  }
+  updateProgress(95, 'PNG変換中...');
+  const blob = await canvasToBlob(canvas);
+  hideProgress();
+  downloadBlob(blob, `${currentAnim.name}_spritesheet.png`);
+  showToast('スプライトシート書き出し完了', 'success');
+}
+
+async function exportAllZIP() {
+  if (!acsData) { showToast('ファイルを読み込んでください', 'error'); return; }
+  const scale = parseInt(document.getElementById('allGifScale').value);
+  const zip = new JSZip();
+  const gifFolder   = zip.folder('animations');
+  const audioFolder = zip.folder('audio');
+  const total = acsData.animations.length + acsData.audioClips.length;
+  let done = 0;
+  showProgress('全データ書き出し中...', 0);
+  const workerScript = await getGifWorkerScriptUrl();
+
+  for (const anim of acsData.animations) {
+    try {
+      const timeline = getAnimationExportTimeline(anim);
+      const w = acsData.charInfo.width * scale;
+      const h = acsData.charInfo.height * scale;
+      const gifBlob = await new Promise(resolve => {
+        const gif = new GIF({ workers: 1, workerScript, quality: 10, width: w, height: h, repeat: 0, transparent: 0 });
+        for (const entry of timeline) {
+          const c = compositeFrame(entry.anim, entry.frameIdx, scale);
+          gif.addFrame(c, { delay: entry.durationMs, copy: true, dispose: 2 });
+        }
+        gif.on('finished', b => resolve(b));
+        gif.render();
+      });
+      const suffix = anim.patterns && anim.patterns.length > 1 ? '_patterns' : '';
+      gifFolder.file(`${safeFilePart(anim.name)}${suffix}.gif`, await gifBlob.arrayBuffer());
+    } catch(e) { console.warn('GIF error:', anim.name, e); }
+    done++;
+    updateProgress((done/total)*85, anim.name);
+  }
+
+  for (let i = 0; i < acsData.audioClips.length; i++) {
+    const clip = acsData.audioClips[i];
+    if (clip && clip.length > 0) audioFolder.file(`audio_${i}.wav`, clip);
+    done++;
+    updateProgress((done/total)*85, `音声 #${i}`);
+  }
+
+  updateProgress(92, 'ZIP圧縮中...');
+  const blob = await zip.generateAsync({ type: 'blob' });
+  hideProgress();
+  downloadBlob(blob, 'acs_export.zip');
+  showToast('全データ ZIP 書き出し完了', 'success');
+}
+
+async function exportAllPNGs() {
+  if (!acsData) { showToast('ファイルを読み込んでください', 'error'); return; }
+  const scale = parseInt(document.getElementById('allPngScale').value);
+  await generatePNGZip(acsData.animations, scale, true, 'acs_all_frames.zip');
+}
+
+function canvasToBlob(canvas) {
+  return new Promise(r => canvas.toBlob(r, 'image/png'));
+}
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+function setStatus(text, active) {
+  document.getElementById('statusText').textContent = text;
+  document.getElementById('statusDot').className = 'status-dot' + (active ? ' active' : '');
+}
+
+function showProgress(title, pct, msg='') {
+  document.getElementById('progressOverlay').classList.add('active');
+  document.getElementById('progressTitle').textContent = title;
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressMsg').textContent = msg;
+}
+function updateProgress(pct, msg) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressMsg').textContent = msg;
+}
+function hideProgress() {
+  document.getElementById('progressOverlay').classList.remove('active');
+}
+
+function showToast(msg, type='info') {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = (type==='success'?'✓ ':type==='error'?'✗ ':'') + localizeTextValue(msg);
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3500);
+}
+
+// Tabs
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.onclick = () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+    if (tab.dataset.tab === 'images' && acsData) renderImagesGrid();
+  };
+});
+
+// File input
+const fileInput = document.getElementById('fileInput');
+const dropZone  = document.getElementById('dropZone');
+fileInput.onchange = e => loadFile(e.target.files[0]);
+dropZone.ondragover  = e => { e.preventDefault(); dropZone.classList.add('over'); };
+dropZone.ondragleave = () => dropZone.classList.remove('over');
+dropZone.ondrop = e => { e.preventDefault(); dropZone.classList.remove('over'); loadFile(e.dataTransfer.files[0]); };
+
+// Playback controls
+document.getElementById('btnPlay').onclick  = () => {
+  if (!currentAnim) return;
+  const timeline = currentSelection ? getSelectionTimeline(currentSelection) : currentPlaybackTimeline;
+  const startStep = timeline && currentTimelineStep < timeline.length ? currentTimelineStep : 0;
+  playAnim(currentSelection?.anim || currentAnim, currentFrameIdx, timeline, startStep);
+};
+document.getElementById('btnStop').onclick  = stopAnim;
+document.getElementById('speedSlider').oninput = e => {
+  playSpeed = parseFloat(e.target.value);
+  document.getElementById('speedLabel').textContent = playSpeed.toFixed(1) + 'x';
+};
+document.getElementById('previewScale').onchange = e => {
+  previewScale = parseInt(e.target.value, 10);
+  if (currentAnim) renderFrame(currentAnim, currentFrameIdx);
+};
+
+// Search
+document.getElementById('searchInput').oninput = e => {
+  if (!acsData) return;
+  const q = e.target.value.toLowerCase();
+  renderAnimList(acsData.animations.filter(a => a.name.toLowerCase().includes(q)));
+};
+
+// WebP quality label
+document.getElementById('webpQuality').oninput = e => {
+  document.getElementById('webpQualityLabel').textContent = parseFloat(e.target.value).toFixed(2);
+};
+
+applyUILocale(document.body);
+</script>
+</body>
+</html>
